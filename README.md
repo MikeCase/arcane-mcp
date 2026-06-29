@@ -8,10 +8,19 @@ Covers the core Docker management API: containers, images, volumes, networks, Co
 
 ## Install
 
+Not on PyPI. Install directly from GitHub:
+
 ```bash
-pip install arcane-mcp
-# or
-uv tool install arcane-mcp
+# pip
+pip install git+https://github.com/MikeCase/arcane-mcp.git
+
+# uv
+uv tool install git+https://github.com/MikeCase/arcane-mcp.git
+
+# or clone and install locally
+git clone https://github.com/MikeCase/arcane-mcp.git
+cd arcane-mcp
+uv sync
 ```
 
 ## Configuration
@@ -94,17 +103,10 @@ Destructive operations (remove, prune, kill, restore, etc.) require `confirm: bo
 ## Development
 
 ```bash
-git clone <repo>
+git clone https://github.com/MikeCase/arcane-mcp.git
 cd arcane-mcp
 uv sync
-uv run fastmcp run src/opencode_arcane_mcp/server.py
-```
-
-## Publishing
-
-```bash
-uv build
-uv publish
+uv run fastmcp run src/arcane_mcp/server.py
 ```
 
 ## License

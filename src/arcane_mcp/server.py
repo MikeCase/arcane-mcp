@@ -6,7 +6,7 @@ import logging
 
 from fastmcp import FastMCP
 
-from opencode_arcane_mcp.tools import (
+from arcane_mcp.tools import (
     activities,
     containers,
     environments,

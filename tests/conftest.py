@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 from fastmcp import FastMCP
 
-from opencode_arcane_mcp.tools import (
+from arcane_mcp.tools import (
     containers,
     environments,
     images,

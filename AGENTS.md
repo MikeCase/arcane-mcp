@@ -15,7 +15,7 @@ Built with **FastMCP (Python)** and managed with **UV**.
 - **Package Manager:** UV (`uv add`, `uv run`, `uv sync`)
 - **Python:** 3.11 (`.python-version`, `>=3.11` in `pyproject.toml`)
 - **Build:** hatchling
-- **Memory:** GrayMatter hivemind (per-project: `arcane-mcp-<role>`)
+- **Memory:** Hivemind (per-project: `arcane-mcp-<role>`)
 
 ---
 
@@ -23,9 +23,9 @@ Built with **FastMCP (Python)** and managed with **UV**.
 
 ```bash
 uv sync                                            # Install deps
-uv run python -m opencode_arcane_mcp.server        # Run the MCP server (stdio)
-uv run fastmcp run src/opencode_arcane_mcp/server.py  # Same, via FastMCP CLI
-uv run fastmcp dev src/opencode_arcane_mcp/server.py   # Dev mode with inspector (browser UI)
+uv run python -m arcane_mcp.server        # Run the MCP server (stdio)
+uv run fastmcp run src/arcane_mcp/server.py  # Same, via FastMCP CLI
+uv run fastmcp dev src/arcane_mcp/server.py   # Dev mode with inspector (browser UI)
 uv build                                            # Build wheel
 uv publish                                          # Push to PyPI
 ```
@@ -86,7 +86,7 @@ def register(mcp: FastMCP) -> None:
 ## Actual Project Structure
 
 ```
-src/opencode_arcane_mcp/
+src/arcane_mcp/
 ├── __init__.py
 ├── server.py              # FastMCP entrypoint — calls all register() functions
 ├── client.py              # Lazy httpx client factory + _build_headers helper
@@ -168,7 +168,7 @@ async def remove_container(container_id: str, force: bool = False,
 
 ---
 
-## GrayMatter Memory
+## Hivemind Memory
 
 Use per-project agent ID `arcane-mcp-<role>` (e.g. `arcane-mcp-orchestrator`, `arcane-mcp-fixer`).
 

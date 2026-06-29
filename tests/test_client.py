@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from opencode_arcane_mcp import client
+from arcane_mcp import client
 
 
 def test_require_client_raises_without_env(monkeypatch: pytest.MonkeyPatch) -> None:
