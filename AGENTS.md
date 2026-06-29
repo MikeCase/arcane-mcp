@@ -3,7 +3,7 @@
 MCP server that exposes the [Arcane API](https://getarcane.app/api-reference) to AI agents.
 Built with **FastMCP (Python)** and managed with **UV**.
 
-**Status:** Active development. 40 tools across 8 categories covering the full Arcane API surface.
+**Status:** Active development. 44 tools across 8 categories covering the core Arcane API surface.
 
 ---
 
@@ -94,11 +94,11 @@ src/opencode_arcane_mcp/
     ├── __init__.py
     ├── containers.py      # 10 tools: list, inspect, start, stop, restart, remove, create, exec, logs, stats
     ├── environments.py    # 5 tools: list, get, create, update, remove
-    ├── images.py          # 5 tools: list, pull, remove, inspect, tag
-    ├── networks.py        # 6 tools: list, create, inspect, remove, connect, disconnect
+    ├── images.py          # 6 tools: list, pull, remove, inspect, tag, prune
+    ├── networks.py        # 7 tools: list, create, inspect, remove, connect, disconnect, prune
     ├── projects.py        # 6 tools: list, get, deploy, redeploy, update, remove
     ├── system.py          # 3 tools: get_docker_info, get_docker_version, prune_system
-    ├── volumes.py         # 4 tools: list, create, inspect, remove
+    ├── volumes.py         # 5 tools: list, create, inspect, remove, prune
     └── webhooks.py        # 1 tool: trigger_webhook
 ```
 
@@ -123,12 +123,12 @@ Base: `/api/environments/{env_id}`
 
 | Resource | Endpoints |
 |----------|-----------|
-| Containers | GET `/containers`, GET `/containers/{id}`, POST `/containers/{id}/start\|stop\|restart\|exec`, DELETE `/containers/{id}`, POST `/containers`, GET `/containers/{id}/logs\|stats` |
-| Images | GET `/images`, GET `/images/{id}`, POST `/images/pull`, DELETE `/images/{id}`, POST `/images/{id}/tag` |
-| Volumes | GET `/volumes`, GET `/volumes/{name}`, POST `/volumes`, DELETE `/volumes/{name}` |
-| Networks | GET `/networks`, GET `/networks/{id}`, POST `/networks`, DELETE `/networks/{id}`, POST `/networks/{id}/connect\|disconnect` |
-| Projects | GET `/projects`, GET `/projects/{id}`, POST `/projects`, DELETE `/projects/{id}` |
-| System | GET `/info`, GET `/version`, POST `/prune` |
+| Containers | GET `/containers`, GET `/containers/{id}`, POST `/containers`, POST `/containers/{id}/start\|stop\|restart\|kill\|pause\|unpause\|redeploy\|commit\|update`, DELETE `/containers/{id}`, PUT `/containers/{id}/auto-update` |
+| Images | GET `/images`, GET `/images/{id}`, POST `/images/pull\|prune\|build\|search\|upload`, DELETE `/images/{id}`, POST `/images/{name}/tag`, GET `/images/{name}/history\|export\|attestations` |
+| Volumes | GET `/volumes`, GET `/volumes/{name}`, POST `/volumes\|prune`, DELETE `/volumes/{name}`, GET/POST `/volumes/{name}/browse` (full file browser), POST `/volumes/{name}/backups` |
+| Networks | GET `/networks`, GET `/networks/{id}`, POST `/networks\|prune`, DELETE `/networks/{id}`, POST `/networks/{id}/connect\|disconnect` |
+| Projects | GET `/projects`, GET `/projects/{id}`, POST `/projects`, PUT `/projects/{id}`, DELETE `/projects/{id}`, POST `/projects/{id}/up\|down\|restart\|redeploy\|build\|archive\|unarchive\|destroy` |
+| System | GET `/system/docker/info`, POST `/system/prune`, GET `/version`, POST `/system/containers/start-all\|start-stopped\|stop-all`, GET/POST `/system/upgrade` |
 | Environments | GET `/environments`, GET `/environments/{id}`, POST `/environments`, PUT `/environments/{id}`, DELETE `/environments/{id}` |
 | Webhooks | POST `/api/webhooks/trigger/{token}` (env-independent, token is in URL) |
 
@@ -158,7 +158,7 @@ async def remove_container(container_id: str, force: bool = False,
 
 - `.env` must stay gitignored (already is)
 - Auth via `X-Api-Key` — never expose in URLs, return values, or logs
-- `exec_in_container` is high-privilege — log invocations to memory
+- `exec_in_container` is high-privilege — returns API-gap notice (Arcane API doesn't expose exec). Use SSH workaround.
 - `ARCANE_API_KEY` is a secret; treat it like a password
 
 ---

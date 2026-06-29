@@ -17,7 +17,7 @@ def register(mcp: FastMCP) -> None:
     async def get_docker_info(env_id: str = "0", agent_token: str | None = None) -> Any:
         """Get Docker system information for the given environment."""
         client = require_client()
-        url = f"/api/environments/{env_id}/info"
+        url = f"/api/environments/{env_id}/system/docker/info"
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -46,13 +46,35 @@ def register(mcp: FastMCP) -> None:
             return {"error": str(e)}
 
     @mcp.tool()
-    async def prune_system(volumes: bool = False, env_id: str = "0", agent_token: str | None = None, confirm: bool = False) -> Any:
-        """Prune system resources for the given environment. Volumes prune is controlled by volumes flag."""
+    async def prune_system(
+        containers: bool = True,
+        images: bool = True,
+        volumes: bool = False,
+        networks: bool = True,
+        build_cache: bool = False,
+        env_id: str = "0",
+        agent_token: str | None = None,
+        confirm: bool = False,
+    ) -> Any:
+        """Prune system resources for the given environment. Select what to prune via flags (containers, images, volumes, networks, build_cache). Volumes default to False."""
         if not confirm:
-            return {"warning": "Destructive operation. Set confirm=True to prune system resources.", "volumes": volumes}
+            return {
+                "warning": "Destructive operation. Set confirm=True to prune system resources.",
+                "containers": containers,
+                "images": images,
+                "volumes": volumes,
+                "networks": networks,
+                "build_cache": build_cache,
+            }
         client = require_client()
-        url = f"/api/environments/{env_id}/prune"
-        payload = {"volumes": str(volumes).lower()}
+        url = f"/api/environments/{env_id}/system/prune"
+        payload = {
+            "containers": containers,
+            "images": images,
+            "volumes": volumes,
+            "networks": networks,
+            "buildCache": build_cache,
+        }
         try:
             resp = await client.post(url, json=payload, headers=_build_headers(agent_token))
             resp.raise_for_status()

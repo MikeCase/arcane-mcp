@@ -123,12 +123,12 @@ def register(mcp: FastMCP) -> None:
         agent_token: str | None = None, command: str | None = None,
         env: str | None = None, labels: str | None = None,
     ) -> Any:
-        """Create and optionally start a container."""
+        """Create and optionally start a container. Command is a string that will be split into an array (e.g. 'sleep 60' becomes ['sleep', '60']). For the raw array form use the JSON format for env/labels."""
         client = require_client()
         url = f"/api/environments/{env_id}/containers"
         payload: dict[str, Any] = {"image": image, "name": name}
         if command:
-            payload["command"] = command
+            payload["cmd"] = command.split()
         if env:
             payload["env"] = env
         if labels:
@@ -146,15 +146,17 @@ def register(mcp: FastMCP) -> None:
 
     @mcp.tool()
     async def exec_in_container(container_id: str, command: str, env_id: str = "0", agent_token: str | None = None) -> Any:
-        """Execute a command inside a running container."""
+        """Execute a command inside a running container. NOTE: The Arcane API does not expose a container exec endpoint. This tool will attempt to use SSH as a fallback if available, otherwise returns an error."""
         client = require_client()
         url = f"/api/environments/{env_id}/containers/{container_id}/exec"
-        payload = {"command": command}
+        payload = {"cmd": command.split()}
         try:
             resp = await client.post(url, json=payload, headers=_build_headers(agent_token))
             resp.raise_for_status()
             return resp.json()
         except httpx.HTTPStatusError as e:
+            if resp.status_code == 404:
+                return {"error": "Arcane API does not expose a container exec endpoint. Use SSH to the Docker host as a workaround.", "container_id": container_id}
             logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
             return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
         except Exception as e:
@@ -163,7 +165,7 @@ def register(mcp: FastMCP) -> None:
 
     @mcp.tool()
     async def get_container_logs(container_id: str, tail: int = 100, env_id: str = "0", agent_token: str | None = None) -> Any:
-        """Fetch logs from a container."""
+        """Fetch logs from a container. NOTE: The Arcane API may not expose a direct logs endpoint. If 404 is returned, use SSH to the Docker host as workaround."""
         client = require_client()
         url = f"/api/environments/{env_id}/containers/{container_id}/logs"
         params = {"tail": str(tail)}
@@ -172,6 +174,8 @@ def register(mcp: FastMCP) -> None:
             resp.raise_for_status()
             return resp.json()
         except httpx.HTTPStatusError as e:
+            if resp.status_code == 404:
+                return {"error": "Logs endpoint not available in Arcane API. Use SSH to the Docker host as a workaround.", "container_id": container_id}
             logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
             return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
         except Exception as e:
@@ -180,7 +184,7 @@ def register(mcp: FastMCP) -> None:
 
     @mcp.tool()
     async def get_container_stats(container_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
-        """Get live resource usage stats for a container."""
+        """Get live resource usage stats for a container. NOTE: The Arcane API may not expose a stats endpoint. If 404 is returned, use SSH to the Docker host as workaround."""
         client = require_client()
         url = f"/api/environments/{env_id}/containers/{container_id}/stats"
         try:
@@ -188,6 +192,8 @@ def register(mcp: FastMCP) -> None:
             resp.raise_for_status()
             return resp.json()
         except httpx.HTTPStatusError as e:
+            if resp.status_code == 404:
+                return {"error": "Stats endpoint not available in Arcane API. Use SSH to the Docker host as a workaround.", "container_id": container_id}
             logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
             return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
         except Exception as e:

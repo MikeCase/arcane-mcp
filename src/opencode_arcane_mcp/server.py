@@ -39,3 +39,7 @@ logger.info("Registered 8 tool modules")
 def main() -> None:
     """Run the MCP server over stdio transport."""
     mcp.run()
+
+
+if __name__ == "__main__":
+    main()
