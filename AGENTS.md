@@ -3,7 +3,7 @@
 MCP server that exposes the [Arcane API](https://getarcane.app/api-reference) to AI agents.
 Built with **FastMCP (Python)** and managed with **UV**.
 
-**Status:** Active development. 44 tools across 8 categories covering the core Arcane API surface.
+**Status:** Active development. 123 tools across 13 categories covering all major Arcane API endpoints.
 
 ---
 
@@ -92,14 +92,19 @@ src/opencode_arcane_mcp/
 ├── client.py              # Lazy httpx client factory + _build_headers helper
 └── tools/
     ├── __init__.py
-    ├── containers.py      # 10 tools: list, inspect, start, stop, restart, remove, create, exec, logs, stats
+    ├── activities.py      # 7 tools: list_activities, get_activity, cancel_activity, clear_activity_history, list_events, get_environment_events, delete_event
+    ├── containers.py      # 18 tools: list, inspect, create, start, stop, restart, kill, pause, unpause, remove, redeploy, commit, update, exec, logs, stats, set_auto_update, counts
     ├── environments.py    # 5 tools: list, get, create, update, remove
-    ├── images.py          # 6 tools: list, pull, remove, inspect, tag, prune
-    ├── networks.py        # 7 tools: list, create, inspect, remove, connect, disconnect, prune
-    ├── projects.py        # 6 tools: list, get, deploy, redeploy, update, remove
-    ├── system.py          # 3 tools: get_docker_info, get_docker_version, prune_system
-    ├── volumes.py         # 5 tools: list, create, inspect, remove, prune
-    └── webhooks.py        # 1 tool: trigger_webhook
+    ├── images.py          # 19 tools: list, inspect, pull, remove, tag, prune, counts, build, search, upload, history, export, attestations, scan_vulns, get_vulns, vuln_summary, check_update, check_all_updates, update_summary
+    ├── networks.py        # 9 tools: list, create, inspect, remove, connect, disconnect, prune, counts, topology
+    ├── ports.py           # 1 tool: list_ports
+    ├── projects.py        # 17 tools: list, get, deploy, redeploy, update, remove, counts, down, restart, build, archive, unarchive, pull_images, compose, file, update_services, runtime
+    ├── registries.py      # 6 tools: list, create, get, update, delete, test
+    ├── system.py          # 9 tools: get_docker_info, get_docker_version, prune_system, health, check_upgrade, trigger_upgrade, start_all, start_stopped, stop_all
+    ├── updater.py         # 3 tools: run, status, history
+    ├── volumes.py         # 18 tools: list, create, inspect, remove, prune, counts, sizes, usage, list_backups, create_backup, restore_backup, delete_backup, download_backup, browse, read_file, create_dir, upload, delete_file
+    ├── vulnerabilities.py # 6 tools: summary_all, list_all, ignore, list_ignored, unignore, scanner_status
+    └── webhooks.py        # 5 tools: trigger, list, create, update, delete
 ```
 
 ---

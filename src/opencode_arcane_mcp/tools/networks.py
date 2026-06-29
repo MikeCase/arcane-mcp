@@ -134,3 +134,35 @@ def register(mcp: FastMCP) -> None:
         except Exception as e:
             logger.exception("Unexpected error on %s", url)
             return {"error": str(e)}
+
+    @mcp.tool()
+    async def get_network_counts(env_id: str = "0", agent_token: str | None = None) -> Any:
+        """Get network counts for the given environment."""
+        client = require_client()
+        url = f"/api/environments/{env_id}/networks/counts"
+        try:
+            resp = await client.get(url, headers=_build_headers(agent_token))
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
+            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+        except Exception as e:
+            logger.exception("Unexpected error on %s", url)
+            return {"error": str(e)}
+
+    @mcp.tool()
+    async def get_network_topology(env_id: str = "0", agent_token: str | None = None) -> Any:
+        """Get network topology for the given environment."""
+        client = require_client()
+        url = f"/api/environments/{env_id}/networks/topology"
+        try:
+            resp = await client.get(url, headers=_build_headers(agent_token))
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
+            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+        except Exception as e:
+            logger.exception("Unexpected error on %s", url)
+            return {"error": str(e)}

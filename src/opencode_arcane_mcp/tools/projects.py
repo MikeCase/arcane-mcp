@@ -122,3 +122,183 @@ def register(mcp: FastMCP) -> None:
         except Exception as e:
             logger.exception("Unexpected error on %s", url)
             return {"error": str(e)}
+
+    @mcp.tool()
+    async def get_project_counts(env_id: str = "0", agent_token: str | None = None) -> Any:
+        """Get counts of Compose projects in the given environment."""
+        client = require_client()
+        url = f"/api/environments/{env_id}/projects/counts"
+        try:
+            resp = await client.get(url, headers=_build_headers(agent_token))
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
+            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+        except Exception as e:
+            logger.exception("Unexpected error on %s", url)
+            return {"error": str(e)}
+
+    @mcp.tool()
+    async def project_down(project_id: str, env_id: str = "0", agent_token: str | None = None, confirm: bool = False) -> Any:
+        """Take a Compose project down (stop and remove containers). Requires confirm=True to execute."""
+        if not confirm:
+            return {"warning": "Destructive operation. Set confirm=True to take this project down.", "project_id": project_id}
+        client = require_client()
+        url = f"/api/environments/{env_id}/projects/{project_id}/down"
+        try:
+            resp = await client.post(url, headers=_build_headers(agent_token))
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
+            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+        except Exception as e:
+            logger.exception("Unexpected error on %s", url)
+            return {"error": str(e)}
+
+    @mcp.tool()
+    async def restart_project(project_id: str, env_id: str = "0", agent_token: str | None = None, confirm: bool = False) -> Any:
+        """Restart a Compose project. Requires confirm=True to execute."""
+        if not confirm:
+            return {"warning": "Destructive operation. Set confirm=True to restart this project.", "project_id": project_id}
+        client = require_client()
+        url = f"/api/environments/{env_id}/projects/{project_id}/restart"
+        try:
+            resp = await client.post(url, headers=_build_headers(agent_token))
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
+            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+        except Exception as e:
+            logger.exception("Unexpected error on %s", url)
+            return {"error": str(e)}
+
+    @mcp.tool()
+    async def build_project(project_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
+        """Build a Compose project's images."""
+        client = require_client()
+        url = f"/api/environments/{env_id}/projects/{project_id}/build"
+        try:
+            resp = await client.post(url, headers=_build_headers(agent_token))
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
+            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+        except Exception as e:
+            logger.exception("Unexpected error on %s", url)
+            return {"error": str(e)}
+
+    @mcp.tool()
+    async def archive_project(project_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
+        """Archive a Compose project."""
+        client = require_client()
+        url = f"/api/environments/{env_id}/projects/{project_id}/archive"
+        try:
+            resp = await client.post(url, headers=_build_headers(agent_token))
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
+            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+        except Exception as e:
+            logger.exception("Unexpected error on %s", url)
+            return {"error": str(e)}
+
+    @mcp.tool()
+    async def unarchive_project(project_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
+        """Unarchive a Compose project."""
+        client = require_client()
+        url = f"/api/environments/{env_id}/projects/{project_id}/unarchive"
+        try:
+            resp = await client.post(url, headers=_build_headers(agent_token))
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
+            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+        except Exception as e:
+            logger.exception("Unexpected error on %s", url)
+            return {"error": str(e)}
+
+    @mcp.tool()
+    async def pull_project_images(project_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
+        """Pull images for a Compose project."""
+        client = require_client()
+        url = f"/api/environments/{env_id}/projects/{project_id}/pull"
+        try:
+            resp = await client.post(url, headers=_build_headers(agent_token))
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
+            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+        except Exception as e:
+            logger.exception("Unexpected error on %s", url)
+            return {"error": str(e)}
+
+    @mcp.tool()
+    async def get_project_compose(project_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
+        """Get the Compose file content for a project."""
+        client = require_client()
+        url = f"/api/environments/{env_id}/projects/{project_id}/compose"
+        try:
+            resp = await client.get(url, headers=_build_headers(agent_token))
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
+            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+        except Exception as e:
+            logger.exception("Unexpected error on %s", url)
+            return {"error": str(e)}
+
+    @mcp.tool()
+    async def get_project_file(project_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
+        """Get the project file content for a Compose project."""
+        client = require_client()
+        url = f"/api/environments/{env_id}/projects/{project_id}/file"
+        try:
+            resp = await client.get(url, headers=_build_headers(agent_token))
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
+            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+        except Exception as e:
+            logger.exception("Unexpected error on %s", url)
+            return {"error": str(e)}
+
+    @mcp.tool()
+    async def update_project_services(project_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
+        """Update services of a Compose project from the current compose config."""
+        client = require_client()
+        url = f"/api/environments/{env_id}/projects/{project_id}/update-services"
+        try:
+            resp = await client.post(url, headers=_build_headers(agent_token))
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
+            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+        except Exception as e:
+            logger.exception("Unexpected error on %s", url)
+            return {"error": str(e)}
+
+    @mcp.tool()
+    async def get_project_runtime(project_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
+        """Get the runtime info for a Compose project."""
+        client = require_client()
+        url = f"/api/environments/{env_id}/projects/{project_id}/runtime"
+        try:
+            resp = await client.get(url, headers=_build_headers(agent_token))
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
+            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+        except Exception as e:
+            logger.exception("Unexpected error on %s", url)
+            return {"error": str(e)}

@@ -85,3 +85,123 @@ def register(mcp: FastMCP) -> None:
         except Exception as e:
             logger.exception("Unexpected error on %s", url)
             return {"error": str(e)}
+
+    @mcp.tool()
+    async def get_system_health(env_id: str = "0", agent_token: str | None = None) -> Any:
+        """Get system health metrics for the given environment."""
+        client = require_client()
+        url = f"/api/environments/{env_id}/system/health"
+        try:
+            resp = await client.get(url, headers=_build_headers(agent_token))
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
+            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+        except Exception as e:
+            logger.exception("Unexpected error on %s", url)
+            return {"error": str(e)}
+
+    @mcp.tool()
+    async def check_system_upgrade(env_id: str = "0", agent_token: str | None = None) -> Any:
+        """Check if a system upgrade is available for the given environment."""
+        client = require_client()
+        url = f"/api/environments/{env_id}/system/upgrade/check"
+        try:
+            resp = await client.get(url, headers=_build_headers(agent_token))
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
+            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+        except Exception as e:
+            logger.exception("Unexpected error on %s", url)
+            return {"error": str(e)}
+
+    @mcp.tool()
+    async def trigger_upgrade(env_id: str = "0", agent_token: str | None = None) -> Any:
+        """Trigger a system upgrade for the given environment."""
+        client = require_client()
+        url = f"/api/environments/{env_id}/system/upgrade"
+        try:
+            resp = await client.post(url, headers=_build_headers(agent_token))
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
+            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+        except Exception as e:
+            logger.exception("Unexpected error on %s", url)
+            return {"error": str(e)}
+
+    @mcp.tool()
+    async def start_all_containers(
+        env_id: str = "0",
+        agent_token: str | None = None,
+        confirm: bool = False,
+    ) -> Any:
+        """Start all stopped containers for the given environment. Requires confirm=True."""
+        if not confirm:
+            return {
+                "warning": "Operation requires explicit confirmation. Set confirm=True to start all containers.",
+            }
+        client = require_client()
+        url = f"/api/environments/{env_id}/system/containers/start-all"
+        try:
+            resp = await client.post(url, headers=_build_headers(agent_token))
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
+            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+        except Exception as e:
+            logger.exception("Unexpected error on %s", url)
+            return {"error": str(e)}
+
+    @mcp.tool()
+    async def start_stopped_containers(
+        env_id: str = "0",
+        agent_token: str | None = None,
+        confirm: bool = False,
+    ) -> Any:
+        """Start only containers that are currently stopped for the given environment. Requires confirm=True."""
+        if not confirm:
+            return {
+                "warning": "Operation requires explicit confirmation. Set confirm=True to start stopped containers.",
+            }
+        client = require_client()
+        url = f"/api/environments/{env_id}/system/containers/start-stopped"
+        try:
+            resp = await client.post(url, headers=_build_headers(agent_token))
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
+            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+        except Exception as e:
+            logger.exception("Unexpected error on %s", url)
+            return {"error": str(e)}
+
+    @mcp.tool()
+    async def stop_all_containers(
+        env_id: str = "0",
+        agent_token: str | None = None,
+        confirm: bool = False,
+    ) -> Any:
+        """Stop all running containers for the given environment. Requires confirm=True."""
+        if not confirm:
+            return {
+                "warning": "Operation requires explicit confirmation. Set confirm=True to stop all containers.",
+            }
+        client = require_client()
+        url = f"/api/environments/{env_id}/system/containers/stop-all"
+        try:
+            resp = await client.post(url, headers=_build_headers(agent_token))
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
+            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+        except Exception as e:
+            logger.exception("Unexpected error on %s", url)
+            return {"error": str(e)}

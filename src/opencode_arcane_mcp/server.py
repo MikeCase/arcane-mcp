@@ -7,13 +7,18 @@ import logging
 from fastmcp import FastMCP
 
 from opencode_arcane_mcp.tools import (
+    activities,
     containers,
     environments,
     images,
     networks,
+    ports,
     projects,
+    registries,
     system,
+    updater,
     volumes,
+    vulnerabilities,
     webhooks,
 )
 
@@ -24,16 +29,21 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(messag
 mcp = FastMCP("opencode-arcane-mcp")
 
 # Register all tool sets with the MCP server
+activities.register(mcp)
 containers.register(mcp)
 environments.register(mcp)
 images.register(mcp)
 networks.register(mcp)
-system.register(mcp)
-volumes.register(mcp)
+ports.register(mcp)
 projects.register(mcp)
+registries.register(mcp)
+system.register(mcp)
+updater.register(mcp)
+volumes.register(mcp)
+vulnerabilities.register(mcp)
 webhooks.register(mcp)
 
-logger.info("Registered 8 tool modules")
+logger.info("Registered 13 tool modules")
 
 
 def main() -> None:

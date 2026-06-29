@@ -199,3 +199,135 @@ def register(mcp: FastMCP) -> None:
         except Exception as e:
             logger.exception("Unexpected error on %s", url)
             return {"error": str(e)}
+
+    @mcp.tool()
+    async def kill_container(container_id: str, env_id: str = "0", agent_token: str | None = None, confirm: bool = False) -> Any:
+        """Force-kill a running container. Requires confirm=True to execute."""
+        if not confirm:
+            return {"warning": "Destructive operation. Set confirm=True to kill this container.", "container_id": container_id}
+        client = require_client()
+        url = f"/api/environments/{env_id}/containers/{container_id}/kill"
+        try:
+            resp = await client.post(url, headers=_build_headers(agent_token))
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
+            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+        except Exception as e:
+            logger.exception("Unexpected error on %s", url)
+            return {"error": str(e)}
+
+    @mcp.tool()
+    async def pause_container(container_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
+        """Pause a running container (freeze its processes)."""
+        client = require_client()
+        url = f"/api/environments/{env_id}/containers/{container_id}/pause"
+        try:
+            resp = await client.post(url, headers=_build_headers(agent_token))
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
+            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+        except Exception as e:
+            logger.exception("Unexpected error on %s", url)
+            return {"error": str(e)}
+
+    @mcp.tool()
+    async def unpause_container(container_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
+        """Unpause a paused container."""
+        client = require_client()
+        url = f"/api/environments/{env_id}/containers/{container_id}/unpause"
+        try:
+            resp = await client.post(url, headers=_build_headers(agent_token))
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
+            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+        except Exception as e:
+            logger.exception("Unexpected error on %s", url)
+            return {"error": str(e)}
+
+    @mcp.tool()
+    async def redeploy_container(container_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
+        """Redeploy a container using its original image and configuration."""
+        client = require_client()
+        url = f"/api/environments/{env_id}/containers/{container_id}/redeploy"
+        try:
+            resp = await client.post(url, headers=_build_headers(agent_token))
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
+            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+        except Exception as e:
+            logger.exception("Unexpected error on %s", url)
+            return {"error": str(e)}
+
+    @mcp.tool()
+    async def commit_container(container_id: str, repo: str = "", tag: str = "latest", env_id: str = "0", agent_token: str | None = None) -> Any:
+        """Commit a container's current state to a new image."""
+        client = require_client()
+        url = f"/api/environments/{env_id}/containers/{container_id}/commit"
+        payload = {"repo": repo, "tag": tag}
+        try:
+            resp = await client.post(url, json=payload, headers=_build_headers(agent_token))
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
+            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+        except Exception as e:
+            logger.exception("Unexpected error on %s", url)
+            return {"error": str(e)}
+
+    @mcp.tool()
+    async def update_container(container_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
+        """Update a container's configuration (e.g. after image or resource changes)."""
+        client = require_client()
+        url = f"/api/environments/{env_id}/containers/{container_id}/update"
+        try:
+            resp = await client.post(url, json={}, headers=_build_headers(agent_token))
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
+            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+        except Exception as e:
+            logger.exception("Unexpected error on %s", url)
+            return {"error": str(e)}
+
+    @mcp.tool()
+    async def set_container_auto_update(container_id: str, enabled: bool, env_id: str = "0", agent_token: str | None = None) -> Any:
+        """Enable or disable automatic updates for a container."""
+        client = require_client()
+        url = f"/api/environments/{env_id}/containers/{container_id}/auto-update"
+        payload = {"enabled": enabled}
+        try:
+            resp = await client.put(url, json=payload, headers=_build_headers(agent_token))
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
+            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+        except Exception as e:
+            logger.exception("Unexpected error on %s", url)
+            return {"error": str(e)}
+
+    @mcp.tool()
+    async def get_container_counts(env_id: str = "0", agent_token: str | None = None) -> Any:
+        """Get container counts by status (running, stopped, paused, etc.)."""
+        client = require_client()
+        url = f"/api/environments/{env_id}/containers/counts"
+        try:
+            resp = await client.get(url, headers=_build_headers(agent_token))
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
+            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+        except Exception as e:
+            logger.exception("Unexpected error on %s", url)
+            return {"error": str(e)}
