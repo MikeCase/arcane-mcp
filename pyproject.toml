@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 packages = ["src/opencode_arcane_mcp"]
 
 [project]
-name = "opencode-arcane-mcp"
+name = "arcane-mcp"
 version = "0.3.0"
 description = "MCP server for Docker management via the Arcane API"
 readme = "README.md"
@@ -59,7 +59,7 @@ disable_error_code = ["type-arg"]
 
 [project.urls]
 Homepage = "https://github.com/getarcaneapp/arcane"
-Repository = "https://github.com/splaq/opencode-arcane-mcp"
+Repository = "https://github.com/splaq/arcane-mcp"
 
 [project.scripts]
-opencode-arcane-mcp = "opencode_arcane_mcp.server:main"
+arcane-mcp = "opencode_arcane_mcp.server:main"

@@ -1,4 +1,4 @@
-# opencode-arcane-mcp
+# arcane-mcp
 
 An MCP server that exposes [Arcane](https://getarcane.app) Docker management capabilities to AI agents via the Model Context Protocol. Built with FastMCP.
 
@@ -9,9 +9,9 @@ Covers the core Docker management API: containers, images, volumes, networks, Co
 ## Install
 
 ```bash
-pip install opencode-arcane-mcp
+pip install arcane-mcp
 # or
-uv tool install opencode-arcane-mcp
+uv tool install arcane-mcp
 ```
 
 ## Configuration
@@ -32,7 +32,7 @@ Add to your `opencode.json`:
   "mcp": {
     "arcane-docker": {
       "type": "local",
-      "command": ["opencode-arcane-mcp"],
+      "command": ["arcane-mcp"],
       "env": {
         "ARCANE_API_KEY": "arc_your_key_here",
         "ARCANE_BASE_URL": "http://localhost:3552"
@@ -95,7 +95,7 @@ Destructive operations (remove, prune, kill, restore, etc.) require `confirm: bo
 
 ```bash
 git clone <repo>
-cd opencode-arcane-mcp
+cd arcane-mcp
 uv sync
 uv run fastmcp run src/opencode_arcane_mcp/server.py
 ```
