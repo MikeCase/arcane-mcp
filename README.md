@@ -4,7 +4,7 @@ An MCP server that exposes [Arcane](https://getarcane.app) Docker management cap
 
 Covers the core Docker management API: containers, images, volumes, networks, Compose projects, registries, vulnerability scanning, port mappings, webhooks, system management, updater, activities/events, and environment management.
 
-**123 tools across 13 modules.**
+**125 tools across 14 modules.**
 
 ## Install
 
@@ -53,7 +53,7 @@ Add to your `opencode.json`:
 
 Or set environment variables globally and omit them from the config.
 
-## Tools (123 total)
+## Tools (125 total)
 
 ### Containers (18)
 list_containers, inspect_container, create_container, start_container, stop_container, restart_container, kill_container, pause_container, unpause_container, remove_container, redeploy_container, commit_container, update_container, set_container_auto_update, exec_in_container, get_container_logs, get_container_stats, get_container_counts
@@ -94,11 +94,50 @@ run_updater, get_updater_status, get_updater_history
 ### Ports (1)
 list_ports
 
+### Operations / Safety (2)
+confirm_operation, read_audit_log
+
 ## Usage
 
 All resource tools accept `env_id: str = "0"` to target a specific Arcane environment (local Docker is "0", remote agents use UUIDs). Remote agent operations can pass `agent_token: str | None` for authentication via the `X-Arcane-Agent-Token` header.
 
-Destructive operations (remove, prune, kill, restore, etc.) require `confirm: bool = False` — set to `True` to execute.
+## Safety
+
+Destructive operations use a **three-layer safety system**:
+
+### 1. Confirmation tokens (two-step handshake)
+Every tool that removes, prunes, kills, restores, or overwrites returns a short-lived `confirmation_token` instead of executing. The agent must call `confirm_operation(token)` as a separate tool call to proceed. Tokens expire after 120 seconds.
+
+```
+remove_container("my-app")
+→ {"warning": "...", "confirmation_token": "a1b2c3d4e5f6", "target": "my-app"}
+
+confirm_operation(token="a1b2c3d4e5f6")
+→ {"success": true, ...}
+```
+
+This prevents an agent from blasting through a safety gate in one call — it must stop, process the warning, and make a second call.
+
+### 2. Dry-run mode (prune/cleanup tools)
+Prune operations (`prune_images`, `prune_volumes`, `prune_networks`, `prune_system`, `clear_activity_history`) default to `dry_run=True`, showing what would be affected without making changes:
+
+```
+prune_images()
+→ {"dry_run": true, "warning": "Dry-run. Set dry_run=False to proceed.", "target": "all"}
+
+prune_images(dry_run=False)
+→ {"warning": "...", "confirmation_token": "..."}
+```
+
+### 3. Audit log
+Every confirmed destructive operation is recorded to a structured JSON-lines audit log. Read it anytime:
+
+```
+read_audit_log(lines=10)
+→ [{"timestamp": "2026-06-29T...", "action": "remove_container", "target": "my-app", "env_id": "0"}]
+```
+
+Set `ARCANE_MCP_AUDIT_LOG` environment variable to change the log file path (default: `~/.arcane-mcp-audit.log`).
 
 ## Development
 

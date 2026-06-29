@@ -8,6 +8,7 @@ import httpx
 from fastmcp import FastMCP
 
 from ..client import require_client
+from ..safety import get_token_store
 
 logger = logging.getLogger(__name__)
 
@@ -86,19 +87,16 @@ def register(mcp: FastMCP) -> None:
             return {"error": str(e)}
 
     @mcp.tool()
-    async def remove_environment(env_id: str, confirm: bool = False) -> Any:
-        """Remove an environment. Requires confirm=True to execute."""
-        if not confirm:
-            return {"warning": "Destructive operation. Set confirm=True to remove this environment.", "env_id": env_id}
-        client = require_client()
-        url = f"/api/environments/{env_id}"
-        try:
-            resp = await client.delete(url)
-            resp.raise_for_status()
-            return resp.json()
-        except httpx.HTTPStatusError as e:
-            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
-            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
-        except Exception as e:
-            logger.exception("Unexpected error on %s", url)
-            return {"error": str(e)}
+    async def remove_environment(env_id: str) -> Any:
+        """Remove an environment. Requires confirmation via confirmation_token."""
+        token = get_token_store().create(
+            action="remove_environment",
+            target=env_id,
+            endpoint=f"/api/environments/{env_id}",
+            method="DELETE",
+            body=None,
+            params=None,
+            env_id=env_id,
+            agent_token=None,
+        )
+        return {"warning": "Destructive operation. Call confirm_operation(token=...) to proceed.", "confirmation_token": token, "target": env_id, "action": "remove_environment"}

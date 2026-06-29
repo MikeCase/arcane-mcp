@@ -8,6 +8,7 @@ import httpx
 from fastmcp import FastMCP
 
 from ..client import _build_headers, require_client
+from ..safety import get_token_store
 
 logger = logging.getLogger(__name__)
 
@@ -49,24 +50,25 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     async def remove_image(
         image_id: str, force: bool = False, env_id: str = "0",
-        agent_token: str | None = None, confirm: bool = False,
+        agent_token: str | None = None,
     ) -> Any:
-        """Remove image by id. Destructive; requires confirm=True."""
-        if not confirm:
-            return {"warning": "Destructive operation requires confirm=True to proceed."}
-        client = require_client()
-        url = f"/api/environments/{env_id}/images/{image_id}"
-        body = {"force": str(force).lower()}
-        try:
-            resp = await client.request("DELETE", url, json=body, headers=_build_headers(agent_token))
-            resp.raise_for_status()
-            return resp.json()
-        except httpx.HTTPStatusError as e:
-            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
-            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
-        except Exception as e:
-            logger.exception("Unexpected error on %s", url)
-            return {"error": str(e)}
+        """Remove image by id. Requires confirmation token to execute."""
+        token = get_token_store().create(
+            action="remove_image",
+            target=image_id,
+            endpoint=f"/api/environments/{env_id}/images/{image_id}",
+            method="DELETE",
+            body={"force": str(force).lower()},
+            params=None,
+            env_id=env_id,
+            agent_token=agent_token,
+        )
+        return {
+            "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
+            "confirmation_token": token,
+            "target": image_id,
+            "action": "remove_image",
+        }
 
     @mcp.tool()
     async def inspect_image(image_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
@@ -102,22 +104,35 @@ def register(mcp: FastMCP) -> None:
             return {"error": str(e)}
 
     @mcp.tool()
-    async def prune_images(env_id: str = "0", agent_token: str | None = None, confirm: bool = False) -> Any:
-        """Prune unused Docker images. Destructive; requires confirm=True."""
-        if not confirm:
-            return {"warning": "Destructive operation. Set confirm=True to prune unused images."}
-        client = require_client()
-        url = f"/api/environments/{env_id}/images/prune"
-        try:
-            resp = await client.post(url, headers=_build_headers(agent_token))
-            resp.raise_for_status()
-            return resp.json()
-        except httpx.HTTPStatusError as e:
-            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
-            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
-        except Exception as e:
-            logger.exception("Unexpected error on %s", url)
-            return {"error": str(e)}
+    async def prune_images(env_id: str = "0", dry_run: bool = True, agent_token: str | None = None) -> Any:
+        """Prune unused Docker images. Destructive; use dry_run=False and confirmation token to execute.
+
+        When dry_run=True (default), returns a dry-run warning without creating a
+        confirmation token. Set dry_run=False to get a confirmation token for execution.
+        """
+        if dry_run:
+            return {
+                "dry_run": True,
+                "warning": "Dry-run. Set dry_run=False and confirm to execute.",
+                "action": "prune_images",
+                "target": "all",
+            }
+        token = get_token_store().create(
+            action="prune_images",
+            target="all",
+            endpoint=f"/api/environments/{env_id}/images/prune",
+            method="POST",
+            body=None,
+            params=None,
+            env_id=env_id,
+            agent_token=agent_token,
+        )
+        return {
+            "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
+            "confirmation_token": token,
+            "target": "all",
+            "action": "prune_images",
+        }
 
     @mcp.tool()
     async def get_image_counts(env_id: str = "0", agent_token: str | None = None) -> Any:

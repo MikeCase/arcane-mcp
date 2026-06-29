@@ -3,7 +3,7 @@
 MCP server that exposes the [Arcane API](https://getarcane.app/api-reference) to AI agents.
 Built with **FastMCP (Python)** and managed with **UV**.
 
-**Status:** Active development. 123 tools across 13 categories covering all major Arcane API endpoints.
+**Status:** Active development. 125 tools across 14 categories covering all major Arcane API endpoints.
 
 ---
 
@@ -79,7 +79,7 @@ def register(mcp: FastMCP) -> None:
 - **`env_id: str = "0"`** on every resource tool (string, NOT int — the API uses UUIDs for remote agents)
 - **`agent_token: str | None = None`** on every resource tool (passed as `X-Arcane-Agent-Token` header for remote agent auth)
 - **Error handling:** always return a dict, never raise. Use the httpx exception block pattern above.
-- **Destructive tools** (`remove_*`, `prune_*`) require `confirm: bool = False` — gate on it, return warning dict.
+- **Destructive tools** (`remove_*`, `prune_*`) use a three-layer safety system: confirmation tokens (two-step handshake via `confirm_operation()`), dry-run default on prune tools, and structured audit logging to `~/.arcane-mcp-audit.log`.
 
 ---
 

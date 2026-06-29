@@ -8,6 +8,7 @@ import httpx
 from fastmcp import FastMCP
 
 from ..client import _build_headers, require_client
+from ..safety import get_token_store
 
 logger = logging.getLogger(__name__)
 
@@ -62,22 +63,21 @@ def register(mcp: FastMCP) -> None:
             return {"error": str(e)}
 
     @mcp.tool()
-    async def clear_activity_history(env_id: str = "0", agent_token: str | None = None, confirm: bool = False) -> Any:
-        """Clear activity history for an environment. Requires confirm=True."""
-        if not confirm:
-            return {"warning": "Destructive operation. Set confirm=True to clear activity history."}
-        client = require_client()
-        url = f"/api/environments/{env_id}/activities/history"
-        try:
-            resp = await client.delete(url, headers=_build_headers(agent_token))
-            resp.raise_for_status()
-            return resp.json()
-        except httpx.HTTPStatusError as e:
-            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
-            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
-        except Exception as e:
-            logger.exception("Unexpected error on %s", url)
-            return {"error": str(e)}
+    async def clear_activity_history(env_id: str = "0", agent_token: str | None = None, dry_run: bool = True) -> Any:
+        """Clear activity history for an environment. Requires confirmation via confirmation_token."""
+        if dry_run:
+            return {"warning": "Dry-run: would clear activity history. Set dry_run=False and call confirm_operation(token=...) to proceed.", "target": env_id, "action": "clear_activity_history"}
+        token = get_token_store().create(
+            action="clear_activity_history",
+            target=env_id,
+            endpoint=f"/api/environments/{env_id}/activities/history",
+            method="DELETE",
+            body=None,
+            params=None,
+            env_id=env_id,
+            agent_token=agent_token,
+        )
+        return {"warning": "Destructive operation. Call confirm_operation(token=...) to proceed.", "confirmation_token": token, "target": env_id, "action": "clear_activity_history"}
 
     @mcp.tool()
     async def list_events(agent_token: str | None = None) -> Any:
@@ -112,19 +112,16 @@ def register(mcp: FastMCP) -> None:
             return {"error": str(e)}
 
     @mcp.tool()
-    async def delete_event(event_id: str, agent_token: str | None = None, confirm: bool = False) -> Any:
-        """Delete a system event. Requires confirm=True."""
-        if not confirm:
-            return {"warning": "Destructive operation. Set confirm=True to delete this event.", "event_id": event_id}
-        client = require_client()
-        url = f"/api/events/{event_id}"
-        try:
-            resp = await client.delete(url, headers=_build_headers(agent_token))
-            resp.raise_for_status()
-            return resp.json()
-        except httpx.HTTPStatusError as e:
-            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
-            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
-        except Exception as e:
-            logger.exception("Unexpected error on %s", url)
-            return {"error": str(e)}
+    async def delete_event(event_id: str, agent_token: str | None = None) -> Any:
+        """Delete a system event. Requires confirmation via confirmation_token."""
+        token = get_token_store().create(
+            action="delete_event",
+            target=event_id,
+            endpoint=f"/api/events/{event_id}",
+            method="DELETE",
+            body=None,
+            params=None,
+            env_id=None,
+            agent_token=agent_token,
+        )
+        return {"warning": "Destructive operation. Call confirm_operation(token=...) to proceed.", "confirmation_token": token, "target": event_id, "action": "delete_event"}

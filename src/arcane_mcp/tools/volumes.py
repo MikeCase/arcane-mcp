@@ -8,6 +8,7 @@ import httpx
 from fastmcp import FastMCP
 
 from ..client import _build_headers, require_client
+from ..safety import get_token_store
 
 logger = logging.getLogger(__name__)
 
@@ -70,42 +71,49 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     async def remove_volume(
         name: str, force: bool = False, env_id: str = "0",
-        agent_token: str | None = None, confirm: bool = False,
+        agent_token: str | None = None,
     ) -> Any:
-        """Remove a volume by name. Destructive; requires confirm=True."""
-        if not confirm:
-            return {"warning": "Destructive operation requires confirm=True to proceed."}
-        client = require_client()
-        url = f"/api/environments/{env_id}/volumes/{name}"
-        body = {"force": str(force).lower()}
-        try:
-            resp = await client.request("DELETE", url, json=body, headers=_build_headers(agent_token))
-            resp.raise_for_status()
-            return resp.json()
-        except httpx.HTTPStatusError as e:
-            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
-            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
-        except Exception as e:
-            logger.exception("Unexpected error on %s", url)
-            return {"error": str(e)}
+        """Remove a volume by name. Destructive; requires confirmation token."""
+        token = get_token_store().create(
+            action="remove_volume",
+            target=f"volume:{name}",
+            endpoint=f"/api/environments/{env_id}/volumes/{name}",
+            method="DELETE",
+            body={"force": str(force).lower()},
+            env_id=env_id,
+            agent_token=agent_token,
+        )
+        return {
+            "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
+            "confirmation_token": token,
+            "target": f"volume:{name}",
+            "action": "remove_volume",
+        }
 
     @mcp.tool()
-    async def prune_volumes(env_id: str = "0", agent_token: str | None = None, confirm: bool = False) -> Any:
-        """Prune unused Docker volumes. Destructive; requires confirm=True."""
-        if not confirm:
-            return {"warning": "Destructive operation. Set confirm=True to prune unused volumes."}
-        client = require_client()
-        url = f"/api/environments/{env_id}/volumes/prune"
-        try:
-            resp = await client.post(url, headers=_build_headers(agent_token))
-            resp.raise_for_status()
-            return resp.json()
-        except httpx.HTTPStatusError as e:
-            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
-            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
-        except Exception as e:
-            logger.exception("Unexpected error on %s", url)
-            return {"error": str(e)}
+    async def prune_volumes(env_id: str = "0", agent_token: str | None = None, dry_run: bool = True) -> Any:
+        """Prune unused Docker volumes. Destructive; use dry_run=False and confirm to execute."""
+        if dry_run:
+            return {
+                "dry_run": True,
+                "warning": "Dry-run. Set dry_run=False and confirm to execute.",
+                "action": "prune_volumes",
+                "target": "all",
+            }
+        token = get_token_store().create(
+            action="prune_volumes",
+            target="all",
+            endpoint=f"/api/environments/{env_id}/volumes/prune",
+            method="POST",
+            env_id=env_id,
+            agent_token=agent_token,
+        )
+        return {
+            "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
+            "confirmation_token": token,
+            "target": "all",
+            "action": "prune_volumes",
+        }
 
     # ── Volume counts & sizes ──────────────────────────────────────────────
 
@@ -194,46 +202,44 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     async def restore_volume_backup(
         volume_name: str, backup_id: str, env_id: str = "0",
-        agent_token: str | None = None, confirm: bool = False,
+        agent_token: str | None = None,
     ) -> Any:
-        """Restore a volume backup. Destructive; requires confirm=True."""
-        if not confirm:
-            return {"warning": "Destructive operation. Set confirm=True to restore this backup.",
-                    "volume_name": volume_name, "backup_id": backup_id}
-        client = require_client()
-        url = f"/api/environments/{env_id}/volumes/{volume_name}/backups/{backup_id}/restore"
-        try:
-            resp = await client.post(url, headers=_build_headers(agent_token))
-            resp.raise_for_status()
-            return resp.json()
-        except httpx.HTTPStatusError as e:
-            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
-            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
-        except Exception as e:
-            logger.exception("Unexpected error on %s", url)
-            return {"error": str(e)}
+        """Restore a volume backup. Destructive; requires confirmation token."""
+        token = get_token_store().create(
+            action="restore_volume_backup",
+            target=f"volume:{volume_name}/backup:{backup_id}",
+            endpoint=f"/api/environments/{env_id}/volumes/{volume_name}/backups/{backup_id}/restore",
+            method="POST",
+            env_id=env_id,
+            agent_token=agent_token,
+        )
+        return {
+            "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
+            "confirmation_token": token,
+            "target": f"volume:{volume_name}/backup:{backup_id}",
+            "action": "restore_volume_backup",
+        }
 
     @mcp.tool()
     async def delete_volume_backup(
         backup_id: str, env_id: str = "0",
-        agent_token: str | None = None, confirm: bool = False,
+        agent_token: str | None = None,
     ) -> Any:
-        """Delete a volume backup. Destructive; requires confirm=True."""
-        if not confirm:
-            return {"warning": "Destructive operation. Set confirm=True to delete this backup.",
-                    "backup_id": backup_id}
-        client = require_client()
-        url = f"/api/environments/{env_id}/volumes/backups/{backup_id}"
-        try:
-            resp = await client.request("DELETE", url, headers=_build_headers(agent_token))
-            resp.raise_for_status()
-            return resp.json()
-        except httpx.HTTPStatusError as e:
-            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
-            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
-        except Exception as e:
-            logger.exception("Unexpected error on %s", url)
-            return {"error": str(e)}
+        """Delete a volume backup. Destructive; requires confirmation token."""
+        token = get_token_store().create(
+            action="delete_volume_backup",
+            target=f"backup:{backup_id}",
+            endpoint=f"/api/environments/{env_id}/volumes/backups/{backup_id}",
+            method="DELETE",
+            env_id=env_id,
+            agent_token=agent_token,
+        )
+        return {
+            "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
+            "confirmation_token": token,
+            "target": f"backup:{backup_id}",
+            "action": "delete_volume_backup",
+        }
 
     @mcp.tool()
     async def download_volume_backup(backup_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
@@ -336,22 +342,21 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     async def delete_volume_file(
         name: str, path: str, env_id: str = "0",
-        agent_token: str | None = None, confirm: bool = False,
+        agent_token: str | None = None,
     ) -> Any:
-        """Delete a file or directory inside a volume. Destructive; requires confirm=True."""
-        if not confirm:
-            return {"warning": "Destructive operation. Set confirm=True to delete this file.",
-                    "volume": name, "path": path}
-        client = require_client()
-        url = f"/api/environments/{env_id}/volumes/{name}/browse"
-        params = {"path": path}
-        try:
-            resp = await client.request("DELETE", url, params=params, headers=_build_headers(agent_token))
-            resp.raise_for_status()
-            return resp.json()
-        except httpx.HTTPStatusError as e:
-            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
-            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
-        except Exception as e:
-            logger.exception("Unexpected error on %s", url)
-            return {"error": str(e)}
+        """Delete a file or directory inside a volume. Destructive; requires confirmation token."""
+        token = get_token_store().create(
+            action="delete_volume_file",
+            target=f"volume:{name}:{path}",
+            endpoint=f"/api/environments/{env_id}/volumes/{name}/browse",
+            method="DELETE",
+            params={"path": path},
+            env_id=env_id,
+            agent_token=agent_token,
+        )
+        return {
+            "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
+            "confirmation_token": token,
+            "target": f"volume:{name}:{path}",
+            "action": "delete_volume_file",
+        }

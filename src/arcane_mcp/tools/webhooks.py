@@ -8,6 +8,7 @@ import httpx
 from fastmcp import FastMCP
 
 from ..client import _build_headers, require_client
+from ..safety import get_token_store
 
 logger = logging.getLogger(__name__)
 
@@ -87,20 +88,17 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     async def delete_webhook(
         webhook_id: str, env_id: str = "0",
-        agent_token: str | None = None, confirm: bool = False,
+        agent_token: str | None = None,
     ) -> Any:
-        """Delete a webhook. Destructive; requires confirm=True."""
-        if not confirm:
-            return {"warning": "Destructive operation. Set confirm=True to delete this webhook.", "webhook_id": webhook_id}
-        client = require_client()
-        api_url = f"/api/environments/{env_id}/webhooks/{webhook_id}"
-        try:
-            resp = await client.delete(api_url, headers=_build_headers(agent_token))
-            resp.raise_for_status()
-            return resp.json()
-        except httpx.HTTPStatusError as e:
-            logger.warning("HTTP %s on %s: %s", resp.status_code, api_url, resp.text)
-            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
-        except Exception as e:
-            logger.exception("Unexpected error on %s", api_url)
-            return {"error": str(e)}
+        """Delete a webhook. Destructive; requires confirmation via confirmation_token."""
+        token = get_token_store().create(
+            action="delete_webhook",
+            target=webhook_id,
+            endpoint=f"/api/environments/{env_id}/webhooks/{webhook_id}",
+            method="DELETE",
+            body=None,
+            params=None,
+            env_id=env_id,
+            agent_token=agent_token,
+        )
+        return {"warning": "Destructive operation. Call confirm_operation(token=...) to proceed.", "confirmation_token": token, "target": webhook_id, "action": "delete_webhook"}

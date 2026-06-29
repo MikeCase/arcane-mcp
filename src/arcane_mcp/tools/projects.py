@@ -8,6 +8,7 @@ import httpx
 from fastmcp import FastMCP
 
 from ..client import _build_headers, require_client
+from ..safety import get_token_store
 
 logger = logging.getLogger(__name__)
 
@@ -79,22 +80,24 @@ def register(mcp: FastMCP) -> None:
             return {"error": str(e)}
 
     @mcp.tool()
-    async def remove_project(project_id: str, env_id: str = "0", agent_token: str | None = None, confirm: bool = False) -> Any:
-        """Remove a Compose project. Requires confirm=True to execute."""
-        if not confirm:
-            return {"warning": "Destructive operation. Set confirm=True to remove this project.", "project_id": project_id}
-        client = require_client()
-        url = f"/api/environments/{env_id}/projects/{project_id}"
-        try:
-            resp = await client.delete(url, headers=_build_headers(agent_token))
-            resp.raise_for_status()
-            return resp.json()
-        except httpx.HTTPStatusError as e:
-            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
-            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
-        except Exception as e:
-            logger.exception("Unexpected error on %s", url)
-            return {"error": str(e)}
+    async def remove_project(project_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
+        """Remove a Compose project."""
+        token = get_token_store().create(
+            action="remove_project",
+            target=project_id,
+            endpoint=f"/api/environments/{env_id}/projects/{project_id}",
+            method="DELETE",
+            body=None,
+            params=None,
+            env_id=env_id,
+            agent_token=agent_token,
+        )
+        return {
+            "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
+            "confirmation_token": token,
+            "target": project_id,
+            "action": "remove_project",
+        }
 
     @mcp.tool()
     async def update_project(
@@ -140,40 +143,44 @@ def register(mcp: FastMCP) -> None:
             return {"error": str(e)}
 
     @mcp.tool()
-    async def project_down(project_id: str, env_id: str = "0", agent_token: str | None = None, confirm: bool = False) -> Any:
-        """Take a Compose project down (stop and remove containers). Requires confirm=True to execute."""
-        if not confirm:
-            return {"warning": "Destructive operation. Set confirm=True to take this project down.", "project_id": project_id}
-        client = require_client()
-        url = f"/api/environments/{env_id}/projects/{project_id}/down"
-        try:
-            resp = await client.post(url, headers=_build_headers(agent_token))
-            resp.raise_for_status()
-            return resp.json()
-        except httpx.HTTPStatusError as e:
-            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
-            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
-        except Exception as e:
-            logger.exception("Unexpected error on %s", url)
-            return {"error": str(e)}
+    async def project_down(project_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
+        """Take a Compose project down (stop and remove containers)."""
+        token = get_token_store().create(
+            action="project_down",
+            target=project_id,
+            endpoint=f"/api/environments/{env_id}/projects/{project_id}/down",
+            method="POST",
+            body=None,
+            params=None,
+            env_id=env_id,
+            agent_token=agent_token,
+        )
+        return {
+            "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
+            "confirmation_token": token,
+            "target": project_id,
+            "action": "project_down",
+        }
 
     @mcp.tool()
-    async def restart_project(project_id: str, env_id: str = "0", agent_token: str | None = None, confirm: bool = False) -> Any:
-        """Restart a Compose project. Requires confirm=True to execute."""
-        if not confirm:
-            return {"warning": "Destructive operation. Set confirm=True to restart this project.", "project_id": project_id}
-        client = require_client()
-        url = f"/api/environments/{env_id}/projects/{project_id}/restart"
-        try:
-            resp = await client.post(url, headers=_build_headers(agent_token))
-            resp.raise_for_status()
-            return resp.json()
-        except httpx.HTTPStatusError as e:
-            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
-            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
-        except Exception as e:
-            logger.exception("Unexpected error on %s", url)
-            return {"error": str(e)}
+    async def restart_project(project_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
+        """Restart a Compose project."""
+        token = get_token_store().create(
+            action="restart_project",
+            target=project_id,
+            endpoint=f"/api/environments/{env_id}/projects/{project_id}/restart",
+            method="POST",
+            body=None,
+            params=None,
+            env_id=env_id,
+            agent_token=agent_token,
+        )
+        return {
+            "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
+            "confirmation_token": token,
+            "target": project_id,
+            "action": "restart_project",
+        }
 
     @mcp.tool()
     async def build_project(project_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:

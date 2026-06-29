@@ -8,6 +8,7 @@ import httpx
 from fastmcp import FastMCP
 
 from ..client import _build_headers, require_client
+from ..safety import get_token_store
 
 logger = logging.getLogger(__name__)
 
@@ -90,22 +91,19 @@ def register(mcp: FastMCP) -> None:
             return {"error": str(e)}
 
     @mcp.tool()
-    async def delete_registry(registry_id: str, env_id: str = "0", agent_token: str | None = None, confirm: bool = False) -> Any:
-        """Delete a container registry. Requires confirm=True."""
-        if not confirm:
-            return {"warning": "Destructive operation. Set confirm=True to delete this registry.", "registry_id": registry_id}
-        client = require_client()
-        url = f"/api/container-registries/{registry_id}"
-        try:
-            resp = await client.delete(url, headers=_build_headers(agent_token))
-            resp.raise_for_status()
-            return resp.json()
-        except httpx.HTTPStatusError as e:
-            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
-            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
-        except Exception as e:
-            logger.exception("Unexpected error on %s", url)
-            return {"error": str(e)}
+    async def delete_registry(registry_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
+        """Delete a container registry. Requires confirmation via confirmation_token."""
+        token = get_token_store().create(
+            action="delete_registry",
+            target=registry_id,
+            endpoint=f"/api/container-registries/{registry_id}",
+            method="DELETE",
+            body=None,
+            params=None,
+            env_id=env_id,
+            agent_token=agent_token,
+        )
+        return {"warning": "Destructive operation. Call confirm_operation(token=...) to proceed.", "confirmation_token": token, "target": registry_id, "action": "delete_registry"}
 
     @mcp.tool()
     async def test_registry(registry_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:

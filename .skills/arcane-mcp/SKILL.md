@@ -49,6 +49,7 @@ The HTTP client is lazy — created on first tool call, not at import. Reads `AR
 | **Vulnerabilities** | 6 | Summary, list all, ignore/unignore, scanner status |
 | **Updater** | 3 | Run, status, history |
 | **Ports** | 1 | List all port mappings |
+| **Operations / Safety** | 2 | confirm_operation, read_audit_log |
 
 ## Key Conventions
 
@@ -57,10 +58,10 @@ Every tool follows these patterns:
 - **`env_id: str = "0"`** — targets a specific Arcane environment (local Docker is "0", remote agents use UUIDs)
 - **`agent_token: str | None = None`** — optional auth for remote agent operations, sent as `X-Arcane-Agent-Token` header
 - **Error handling** — always returns a dict, never raises. Caught exceptions return `{"error": "...", "status_code": ..., "detail": "..."}`
-- **Destructive safety** — tools that remove, prune, kill, restore, or overwrite require `confirm: bool = False`. Without it they return a warning dict:
-  ```python
-  {"warning": "Destructive operation. Set confirm=True to proceed.", "target": "..."}
-  ```
+- **Destructive safety (three layers):**
+  1. **Confirmation tokens** — destructive tools return a short-lived `confirmation_token` instead of executing. Agent must call `confirm_operation(token)` as a separate tool call. Tokens expire after 120 seconds.
+  2. **Dry-run mode** — prune operations (`prune_images`, `prune_volumes`, `prune_networks`, `prune_system`, `clear_activity_history`) default to `dry_run=True`, showing what would be affected without making changes.
+  3. **Audit log** — every confirmed destructive operation is recorded to `~/.arcane-mcp-audit.log` (or `$ARCANE_MCP_AUDIT_LOG`). Read it via `read_audit_log()`.
 
 ## Quick Commands
 

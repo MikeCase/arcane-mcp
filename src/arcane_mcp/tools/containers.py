@@ -8,6 +8,7 @@ import httpx
 from fastmcp import FastMCP
 
 from ..client import _build_headers, require_client
+from ..safety import get_token_store
 
 logger = logging.getLogger(__name__)
 
@@ -98,24 +99,25 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     async def remove_container(
         container_id: str, force: bool = False, env_id: str = "0",
-        agent_token: str | None = None, confirm: bool = False,
+        agent_token: str | None = None,
     ) -> Any:
-        """Remove a container. Requires confirm=True to execute."""
-        if not confirm:
-            return {"warning": "Destructive operation. Set confirm=True to remove this container.", "container_id": container_id}
-        client = require_client()
-        url = f"/api/environments/{env_id}/containers/{container_id}"
-        params = {"force": str(force).lower()}
-        try:
-            resp = await client.delete(url, params=params, headers=_build_headers(agent_token))
-            resp.raise_for_status()
-            return resp.json()
-        except httpx.HTTPStatusError as e:
-            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
-            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
-        except Exception as e:
-            logger.exception("Unexpected error on %s", url)
-            return {"error": str(e)}
+        """Remove a container. Requires confirmation token to execute."""
+        token = get_token_store().create(
+            action="remove_container",
+            target=container_id,
+            endpoint=f"/api/environments/{env_id}/containers/{container_id}",
+            method="DELETE",
+            params={"force": str(force).lower()},
+            body=None,
+            env_id=env_id,
+            agent_token=agent_token,
+        )
+        return {
+            "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
+            "confirmation_token": token,
+            "target": container_id,
+            "action": "remove_container",
+        }
 
     @mcp.tool()
     async def create_container(
@@ -201,22 +203,24 @@ def register(mcp: FastMCP) -> None:
             return {"error": str(e)}
 
     @mcp.tool()
-    async def kill_container(container_id: str, env_id: str = "0", agent_token: str | None = None, confirm: bool = False) -> Any:
-        """Force-kill a running container. Requires confirm=True to execute."""
-        if not confirm:
-            return {"warning": "Destructive operation. Set confirm=True to kill this container.", "container_id": container_id}
-        client = require_client()
-        url = f"/api/environments/{env_id}/containers/{container_id}/kill"
-        try:
-            resp = await client.post(url, headers=_build_headers(agent_token))
-            resp.raise_for_status()
-            return resp.json()
-        except httpx.HTTPStatusError as e:
-            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
-            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
-        except Exception as e:
-            logger.exception("Unexpected error on %s", url)
-            return {"error": str(e)}
+    async def kill_container(container_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
+        """Force-kill a running container. Requires confirmation token to execute."""
+        token = get_token_store().create(
+            action="kill_container",
+            target=container_id,
+            endpoint=f"/api/environments/{env_id}/containers/{container_id}/kill",
+            method="POST",
+            body=None,
+            params=None,
+            env_id=env_id,
+            agent_token=agent_token,
+        )
+        return {
+            "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
+            "confirmation_token": token,
+            "target": container_id,
+            "action": "kill_container",
+        }
 
     @mcp.tool()
     async def pause_container(container_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:

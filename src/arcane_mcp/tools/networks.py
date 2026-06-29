@@ -8,6 +8,7 @@ import httpx
 from fastmcp import FastMCP
 
 from ..client import _build_headers, require_client
+from ..safety import get_token_store
 
 logger = logging.getLogger(__name__)
 
@@ -63,22 +64,22 @@ def register(mcp: FastMCP) -> None:
             return {"error": str(e)}
 
     @mcp.tool()
-    async def remove_network(network_id: str, env_id: str = "0", agent_token: str | None = None, confirm: bool = False) -> Any:
-        """Remove a network. Requires confirm=True to execute."""
-        if not confirm:
-            return {"warning": "Destructive operation. Set confirm=True to remove this network.", "network_id": network_id}
-        client = require_client()
-        url = f"/api/environments/{env_id}/networks/{network_id}"
-        try:
-            resp = await client.delete(url, headers=_build_headers(agent_token))
-            resp.raise_for_status()
-            return resp.json()
-        except httpx.HTTPStatusError as e:
-            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
-            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
-        except Exception as e:
-            logger.exception("Unexpected error on %s", url)
-            return {"error": str(e)}
+    async def remove_network(network_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
+        """Remove a network. Destructive; requires confirmation token."""
+        token = get_token_store().create(
+            action="remove_network",
+            target=f"network:{network_id}",
+            endpoint=f"/api/environments/{env_id}/networks/{network_id}",
+            method="DELETE",
+            env_id=env_id,
+            agent_token=agent_token,
+        )
+        return {
+            "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
+            "confirmation_token": token,
+            "target": f"network:{network_id}",
+            "action": "remove_network",
+        }
 
     @mcp.tool()
     async def connect_container_to_network(network_id: str, container_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
@@ -118,22 +119,29 @@ def register(mcp: FastMCP) -> None:
             return {"error": str(e)}
 
     @mcp.tool()
-    async def prune_networks(env_id: str = "0", agent_token: str | None = None, confirm: bool = False) -> Any:
-        """Prune unused Docker networks. Destructive; requires confirm=True."""
-        if not confirm:
-            return {"warning": "Destructive operation. Set confirm=True to prune unused networks."}
-        client = require_client()
-        url = f"/api/environments/{env_id}/networks/prune"
-        try:
-            resp = await client.post(url, headers=_build_headers(agent_token))
-            resp.raise_for_status()
-            return resp.json()
-        except httpx.HTTPStatusError as e:
-            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
-            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
-        except Exception as e:
-            logger.exception("Unexpected error on %s", url)
-            return {"error": str(e)}
+    async def prune_networks(env_id: str = "0", agent_token: str | None = None, dry_run: bool = True) -> Any:
+        """Prune unused Docker networks. Destructive; use dry_run=False and confirm to execute."""
+        if dry_run:
+            return {
+                "dry_run": True,
+                "warning": "Dry-run. Set dry_run=False and confirm to execute.",
+                "action": "prune_networks",
+                "target": "all",
+            }
+        token = get_token_store().create(
+            action="prune_networks",
+            target="all",
+            endpoint=f"/api/environments/{env_id}/networks/prune",
+            method="POST",
+            env_id=env_id,
+            agent_token=agent_token,
+        )
+        return {
+            "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
+            "confirmation_token": token,
+            "target": "all",
+            "action": "prune_networks",
+        }
 
     @mcp.tool()
     async def get_network_counts(env_id: str = "0", agent_token: str | None = None) -> Any:

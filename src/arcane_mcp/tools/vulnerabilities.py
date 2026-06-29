@@ -8,6 +8,7 @@ import httpx
 from fastmcp import FastMCP
 
 from ..client import _build_headers, require_client
+from ..safety import get_token_store
 
 logger = logging.getLogger(__name__)
 
@@ -79,22 +80,19 @@ def register(mcp: FastMCP) -> None:
             return {"error": str(e)}
 
     @mcp.tool()
-    async def unignore_vulnerability(ignore_id: str, env_id: str = "0", agent_token: str | None = None, confirm: bool = False) -> Any:
-        """Un-ignore a previously ignored vulnerability. Requires confirm=True."""
-        if not confirm:
-            return {"warning": "Operation will re-enable this vulnerability. Set confirm=True to proceed.", "ignore_id": ignore_id}
-        client = require_client()
-        url = f"/api/environments/{env_id}/vulnerabilities/ignore/{ignore_id}"
-        try:
-            resp = await client.delete(url, headers=_build_headers(agent_token))
-            resp.raise_for_status()
-            return resp.json()
-        except httpx.HTTPStatusError as e:
-            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
-            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
-        except Exception as e:
-            logger.exception("Unexpected error on %s", url)
-            return {"error": str(e)}
+    async def unignore_vulnerability(ignore_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
+        """Un-ignore a previously ignored vulnerability. Requires confirmation via confirmation_token."""
+        token = get_token_store().create(
+            action="unignore_vulnerability",
+            target=ignore_id,
+            endpoint=f"/api/environments/{env_id}/vulnerabilities/ignore/{ignore_id}",
+            method="DELETE",
+            body=None,
+            params=None,
+            env_id=env_id,
+            agent_token=agent_token,
+        )
+        return {"warning": "Destructive operation. Call confirm_operation(token=...) to proceed.", "confirmation_token": token, "target": ignore_id, "action": "unignore_vulnerability"}
 
     @mcp.tool()
     async def get_scanner_status(env_id: str = "0", agent_token: str | None = None) -> Any:

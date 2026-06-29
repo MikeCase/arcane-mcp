@@ -12,6 +12,7 @@ from arcane_mcp.tools import (
     environments,
     images,
     networks,
+    operations,
     ports,
     projects,
     registries,
@@ -34,6 +35,7 @@ containers.register(mcp)
 environments.register(mcp)
 images.register(mcp)
 networks.register(mcp)
+operations.register(mcp)
 ports.register(mcp)
 projects.register(mcp)
 registries.register(mcp)
@@ -43,7 +45,7 @@ volumes.register(mcp)
 vulnerabilities.register(mcp)
 webhooks.register(mcp)
 
-logger.info("Registered 13 tool modules")
+logger.info("Registered 14 tool modules")
 
 
 def main() -> None:
