@@ -90,7 +90,7 @@ def register(mcp: FastMCP) -> None:
     async def get_system_health(env_id: str = "0", agent_token: str | None = None) -> Any:
         """Get system health metrics for the given environment."""
         client = require_client()
-        url = f"/api/environments/{env_id}/system/health"
+        url = "/api/health"
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()

@@ -17,7 +17,7 @@ def register(mcp: FastMCP) -> None:
     async def list_registries(env_id: str = "0", agent_token: str | None = None) -> Any:
         """List all container registries."""
         client = require_client()
-        url = f"/api/environments/{env_id}/container-registries"
+        url = "/api/container-registries"
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -33,7 +33,7 @@ def register(mcp: FastMCP) -> None:
     async def create_registry(name: str, url: str, username: str = "", password: str = "", env_id: str = "0", agent_token: str | None = None) -> Any:
         """Create a new container registry."""
         client = require_client()
-        url_path = f"/api/environments/{env_id}/container-registries"
+        url_path = "/api/container-registries"
         payload = {"name": name, "url": url, "username": username, "password": password}
         try:
             resp = await client.post(url_path, json=payload, headers=_build_headers(agent_token))
@@ -50,7 +50,7 @@ def register(mcp: FastMCP) -> None:
     async def get_registry(registry_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Get a container registry by ID."""
         client = require_client()
-        url = f"/api/environments/{env_id}/container-registries/{registry_id}"
+        url = f"/api/container-registries/{registry_id}"
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -66,7 +66,7 @@ def register(mcp: FastMCP) -> None:
     async def update_registry(registry_id: str, name: str | None = None, url: str | None = None, username: str | None = None, password: str | None = None, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Update a container registry."""
         client = require_client()
-        url_path = f"/api/environments/{env_id}/container-registries/{registry_id}"
+        url_path = f"/api/container-registries/{registry_id}"
         payload: dict[str, Any] = {}
         if name is not None:
             payload["name"] = name
@@ -95,7 +95,7 @@ def register(mcp: FastMCP) -> None:
         if not confirm:
             return {"warning": "Destructive operation. Set confirm=True to delete this registry.", "registry_id": registry_id}
         client = require_client()
-        url = f"/api/environments/{env_id}/container-registries/{registry_id}"
+        url = f"/api/container-registries/{registry_id}"
         try:
             resp = await client.delete(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -111,7 +111,7 @@ def register(mcp: FastMCP) -> None:
     async def test_registry(registry_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Test connectivity to a container registry."""
         client = require_client()
-        url = f"/api/environments/{env_id}/container-registries/{registry_id}/test"
+        url = f"/api/container-registries/{registry_id}/test"
         try:
             resp = await client.post(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
