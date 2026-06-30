@@ -8,7 +8,7 @@ import httpx
 from fastmcp import FastMCP
 
 from ..client import _build_headers, require_client
-from ..safety import get_token_store
+from ..safety import ToolClass, compute_operation_hash, get_token_store
 
 logger = logging.getLogger(__name__)
 
@@ -80,14 +80,18 @@ def register(mcp: FastMCP) -> None:
             endpoint=f"/api/environments/{env_id}/volumes/{name}",
             method="DELETE",
             body={"force": str(force).lower()},
+            classification=ToolClass.DESTRUCTIVE_WRITE,
             env_id=env_id,
             agent_token=agent_token,
         )
+        op_hash = compute_operation_hash("remove_volume", name, {"force": str(force).lower()}, None)
         return {
             "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
             "confirmation_token": token,
+            "operation_hash": op_hash,
             "target": f"volume:{name}",
             "action": "remove_volume",
+            "classification": ToolClass.DESTRUCTIVE_WRITE,
         }
 
     @mcp.tool()
@@ -105,14 +109,18 @@ def register(mcp: FastMCP) -> None:
             target="all",
             endpoint=f"/api/environments/{env_id}/volumes/prune",
             method="POST",
+            classification=ToolClass.DESTRUCTIVE_WRITE,
             env_id=env_id,
             agent_token=agent_token,
         )
+        op_hash = compute_operation_hash("prune_volumes", "all", None, None)
         return {
             "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
             "confirmation_token": token,
+            "operation_hash": op_hash,
             "target": "all",
             "action": "prune_volumes",
+            "classification": ToolClass.DESTRUCTIVE_WRITE,
         }
 
     # ── Volume counts & sizes ──────────────────────────────────────────────
@@ -210,14 +218,18 @@ def register(mcp: FastMCP) -> None:
             target=f"volume:{volume_name}/backup:{backup_id}",
             endpoint=f"/api/environments/{env_id}/volumes/{volume_name}/backups/{backup_id}/restore",
             method="POST",
+            classification=ToolClass.DESTRUCTIVE_WRITE,
             env_id=env_id,
             agent_token=agent_token,
         )
+        op_hash = compute_operation_hash("restore_volume_backup", volume_name, None, None)
         return {
             "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
             "confirmation_token": token,
+            "operation_hash": op_hash,
             "target": f"volume:{volume_name}/backup:{backup_id}",
             "action": "restore_volume_backup",
+            "classification": ToolClass.DESTRUCTIVE_WRITE,
         }
 
     @mcp.tool()
@@ -231,14 +243,18 @@ def register(mcp: FastMCP) -> None:
             target=f"backup:{backup_id}",
             endpoint=f"/api/environments/{env_id}/volumes/backups/{backup_id}",
             method="DELETE",
+            classification=ToolClass.DESTRUCTIVE_WRITE,
             env_id=env_id,
             agent_token=agent_token,
         )
+        op_hash = compute_operation_hash("delete_volume_backup", backup_id, None, None)
         return {
             "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
             "confirmation_token": token,
+            "operation_hash": op_hash,
             "target": f"backup:{backup_id}",
             "action": "delete_volume_backup",
+            "classification": ToolClass.DESTRUCTIVE_WRITE,
         }
 
     @mcp.tool()
@@ -291,7 +307,12 @@ def register(mcp: FastMCP) -> None:
         try:
             resp = await client.get(url, params=params, headers=_build_headers(agent_token))
             resp.raise_for_status()
-            return resp.json()
+            result = resp.json()
+            return {
+                "classification": ToolClass.CREDENTIAL_SENSITIVE,
+                "warning": "This response may contain sensitive data (env vars, secrets, config). Handle with care.",
+                "data": result,
+            }
         except httpx.HTTPStatusError as e:
             logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
             return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
@@ -351,12 +372,16 @@ def register(mcp: FastMCP) -> None:
             endpoint=f"/api/environments/{env_id}/volumes/{name}/browse",
             method="DELETE",
             params={"path": path},
+            classification=ToolClass.DESTRUCTIVE_WRITE,
             env_id=env_id,
             agent_token=agent_token,
         )
+        op_hash = compute_operation_hash("delete_volume_file", f"{name}:{path}", None, {"path": path})
         return {
             "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
             "confirmation_token": token,
+            "operation_hash": op_hash,
             "target": f"volume:{name}:{path}",
             "action": "delete_volume_file",
+            "classification": ToolClass.DESTRUCTIVE_WRITE,
         }

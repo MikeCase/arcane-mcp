@@ -8,7 +8,7 @@ import httpx
 from fastmcp import FastMCP
 
 from ..client import _build_headers, require_client
-from ..safety import get_token_store
+from ..safety import ToolClass, compute_operation_hash, get_token_store
 
 logger = logging.getLogger(__name__)
 
@@ -78,12 +78,26 @@ def register(mcp: FastMCP) -> None:
                 "buildCache": build_cache,
             },
             params=None,
+            classification=ToolClass.DESTRUCTIVE_WRITE,
             env_id=env_id,
             agent_token=agent_token,
         )
         return {
             "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
             "confirmation_token": token,
+            "classification": ToolClass.DESTRUCTIVE_WRITE,
+            "operation_hash": compute_operation_hash(
+                "prune_system",
+                f"system:{env_id}",
+                {
+                    "containers": containers,
+                    "images": images,
+                    "volumes": volumes,
+                    "networks": networks,
+                    "buildCache": build_cache,
+                },
+                None,
+            ),
             "target": f"system:{env_id}",
             "action": "prune_system",
         }
@@ -130,12 +144,15 @@ def register(mcp: FastMCP) -> None:
             method="POST",
             body=None,
             params=None,
+            classification=ToolClass.DESTRUCTIVE_WRITE,
             env_id=env_id,
             agent_token=agent_token,
         )
         return {
             "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
             "confirmation_token": token,
+            "classification": ToolClass.DESTRUCTIVE_WRITE,
+            "operation_hash": compute_operation_hash("trigger_upgrade", f"system:{env_id}", None, None),
             "target": f"system:{env_id}",
             "action": "trigger_upgrade",
         }
@@ -153,12 +170,15 @@ def register(mcp: FastMCP) -> None:
             method="POST",
             body=None,
             params=None,
+            classification=ToolClass.DESTRUCTIVE_WRITE,
             env_id=env_id,
             agent_token=agent_token,
         )
         return {
             "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
             "confirmation_token": token,
+            "classification": ToolClass.DESTRUCTIVE_WRITE,
+            "operation_hash": compute_operation_hash("start_all_containers", f"system:{env_id}", None, None),
             "target": f"system:{env_id}",
             "action": "start_all_containers",
         }
@@ -176,12 +196,15 @@ def register(mcp: FastMCP) -> None:
             method="POST",
             body=None,
             params=None,
+            classification=ToolClass.DESTRUCTIVE_WRITE,
             env_id=env_id,
             agent_token=agent_token,
         )
         return {
             "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
             "confirmation_token": token,
+            "classification": ToolClass.DESTRUCTIVE_WRITE,
+            "operation_hash": compute_operation_hash("start_stopped_containers", f"system:{env_id}", None, None),
             "target": f"system:{env_id}",
             "action": "start_stopped_containers",
         }
@@ -199,12 +222,15 @@ def register(mcp: FastMCP) -> None:
             method="POST",
             body=None,
             params=None,
+            classification=ToolClass.DESTRUCTIVE_WRITE,
             env_id=env_id,
             agent_token=agent_token,
         )
         return {
             "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
             "confirmation_token": token,
+            "classification": ToolClass.DESTRUCTIVE_WRITE,
+            "operation_hash": compute_operation_hash("stop_all_containers", f"system:{env_id}", None, None),
             "target": f"system:{env_id}",
             "action": "stop_all_containers",
         }

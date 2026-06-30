@@ -8,7 +8,7 @@ import httpx
 from fastmcp import FastMCP
 
 from ..client import require_client
-from ..safety import get_token_store
+from ..safety import ToolClass, compute_operation_hash, get_token_store
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,12 @@ def register(mcp: FastMCP) -> None:
         try:
             resp = await client.get(url)
             resp.raise_for_status()
-            return resp.json()
+            result = resp.json()
+            return {
+                "classification": ToolClass.CREDENTIAL_SENSITIVE,
+                "warning": "This response may contain sensitive data (env vars, secrets, config). Handle with care.",
+                "data": result,
+            }
         except httpx.HTTPStatusError as e:
             logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
             return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
@@ -96,7 +101,8 @@ def register(mcp: FastMCP) -> None:
             method="DELETE",
             body=None,
             params=None,
+            classification=ToolClass.DESTRUCTIVE_WRITE,
             env_id=env_id,
             agent_token=None,
         )
-        return {"warning": "Destructive operation. Call confirm_operation(token=...) to proceed.", "confirmation_token": token, "target": env_id, "action": "remove_environment"}
+        return {"warning": "Destructive operation. Call confirm_operation(token=...) to proceed.", "confirmation_token": token, "classification": ToolClass.DESTRUCTIVE_WRITE, "operation_hash": compute_operation_hash("remove_environment", env_id, None, None), "target": env_id, "action": "remove_environment"}

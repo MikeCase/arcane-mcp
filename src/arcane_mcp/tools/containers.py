@@ -8,7 +8,7 @@ import httpx
 from fastmcp import FastMCP
 
 from ..client import _build_headers, require_client
-from ..safety import get_token_store
+from ..safety import ToolClass, compute_operation_hash, get_token_store
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,12 @@ def register(mcp: FastMCP) -> None:
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
-            return resp.json()
+            result = resp.json()
+            return {
+                "classification": ToolClass.CREDENTIAL_SENSITIVE,
+                "warning": "This response may contain sensitive data (env vars, secrets, config). Handle with care.",
+                "data": result,
+            }
         except httpx.HTTPStatusError as e:
             logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
             return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
@@ -109,14 +114,18 @@ def register(mcp: FastMCP) -> None:
             method="DELETE",
             params={"force": str(force).lower()},
             body=None,
+            classification=ToolClass.DESTRUCTIVE_WRITE,
             env_id=env_id,
             agent_token=agent_token,
         )
+        op_hash = compute_operation_hash("remove_container", container_id, None, {"force": str(force).lower()})
         return {
             "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
             "confirmation_token": token,
+            "operation_hash": op_hash,
             "target": container_id,
             "action": "remove_container",
+            "classification": ToolClass.DESTRUCTIVE_WRITE,
         }
 
     @mcp.tool()
@@ -212,14 +221,18 @@ def register(mcp: FastMCP) -> None:
             method="POST",
             body=None,
             params=None,
+            classification=ToolClass.DESTRUCTIVE_WRITE,
             env_id=env_id,
             agent_token=agent_token,
         )
+        op_hash = compute_operation_hash("kill_container", container_id, None, None)
         return {
             "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
             "confirmation_token": token,
+            "operation_hash": op_hash,
             "target": container_id,
             "action": "kill_container",
+            "classification": ToolClass.DESTRUCTIVE_WRITE,
         }
 
     @mcp.tool()

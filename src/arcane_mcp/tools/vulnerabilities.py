@@ -8,7 +8,7 @@ import httpx
 from fastmcp import FastMCP
 
 from ..client import _build_headers, require_client
-from ..safety import get_token_store
+from ..safety import ToolClass, compute_operation_hash, get_token_store
 
 logger = logging.getLogger(__name__)
 
@@ -89,10 +89,11 @@ def register(mcp: FastMCP) -> None:
             method="DELETE",
             body=None,
             params=None,
+            classification=ToolClass.DESTRUCTIVE_WRITE,
             env_id=env_id,
             agent_token=agent_token,
         )
-        return {"warning": "Destructive operation. Call confirm_operation(token=...) to proceed.", "confirmation_token": token, "target": ignore_id, "action": "unignore_vulnerability"}
+        return {"warning": "Destructive operation. Call confirm_operation(token=...) to proceed.", "confirmation_token": token, "classification": ToolClass.DESTRUCTIVE_WRITE, "operation_hash": compute_operation_hash("unignore_vulnerability", ignore_id, None, None), "target": ignore_id, "action": "unignore_vulnerability"}
 
     @mcp.tool()
     async def get_scanner_status(env_id: str = "0", agent_token: str | None = None) -> Any:

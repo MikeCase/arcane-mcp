@@ -8,7 +8,7 @@ import httpx
 from fastmcp import FastMCP
 
 from ..client import _build_headers, require_client
-from ..safety import get_token_store
+from ..safety import ToolClass, compute_operation_hash, get_token_store
 
 logger = logging.getLogger(__name__)
 
@@ -60,14 +60,18 @@ def register(mcp: FastMCP) -> None:
             method="DELETE",
             body={"force": str(force).lower()},
             params=None,
+            classification=ToolClass.DESTRUCTIVE_WRITE,
             env_id=env_id,
             agent_token=agent_token,
         )
+        op_hash = compute_operation_hash("remove_image", image_id, {"force": str(force).lower()}, None)
         return {
             "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
             "confirmation_token": token,
+            "operation_hash": op_hash,
             "target": image_id,
             "action": "remove_image",
+            "classification": ToolClass.DESTRUCTIVE_WRITE,
         }
 
     @mcp.tool()
@@ -124,14 +128,18 @@ def register(mcp: FastMCP) -> None:
             method="POST",
             body=None,
             params=None,
+            classification=ToolClass.DESTRUCTIVE_WRITE,
             env_id=env_id,
             agent_token=agent_token,
         )
+        op_hash = compute_operation_hash("prune_images", "all", None, None)
         return {
             "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
             "confirmation_token": token,
+            "operation_hash": op_hash,
             "target": "all",
             "action": "prune_images",
+            "classification": ToolClass.DESTRUCTIVE_WRITE,
         }
 
     @mcp.tool()
