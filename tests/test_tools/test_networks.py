@@ -59,7 +59,11 @@ async def test_remove_network_confirmed(mcp: Any, httpx_mock: Any) -> None:
         method="DELETE",
         json={"message": "removed"},
     )
-    result = await call_tool(mcp, "remove_network", network_id="net1", confirm=True)
+    proposal = await call_tool(mcp, "remove_network", network_id="net1")
+    result = await call_tool(
+        mcp, "confirm_operation",
+        token=proposal["confirmation_token"], operation_hash=proposal["operation_hash"],
+    )
     assert result == {"message": "removed"}
 
 

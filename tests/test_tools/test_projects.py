@@ -40,7 +40,11 @@ async def test_deploy_project(mcp: Any, httpx_mock: Any) -> None:
         method="POST",
         json={"id": "p1", "name": "myapp"},
     )
-    result = await call_tool(mcp, "deploy_project", compose_content="version: '3'", project_name="myapp")
+    proposal = await call_tool(mcp, "deploy_project", compose_content="version: '3'", project_name="myapp")
+    result = await call_tool(
+        mcp, "confirm_operation",
+        token=proposal["confirmation_token"], operation_hash=proposal["operation_hash"],
+    )
     assert result["id"] == "p1"
 
 
@@ -71,7 +75,11 @@ async def test_remove_project_confirmed(mcp: Any, httpx_mock: Any) -> None:
         method="DELETE",
         json={"message": "removed"},
     )
-    result = await call_tool(mcp, "remove_project", project_id="p1", confirm=True)
+    proposal = await call_tool(mcp, "remove_project", project_id="p1")
+    result = await call_tool(
+        mcp, "confirm_operation",
+        token=proposal["confirmation_token"], operation_hash=proposal["operation_hash"],
+    )
     assert result == {"message": "removed"}
 
 
@@ -83,7 +91,11 @@ async def test_update_project(mcp: Any, httpx_mock: Any) -> None:
         method="PATCH",
         json={"id": "p1", "name": "renamed"},
     )
-    result = await call_tool(mcp, "update_project", project_id="p1", project_name="renamed")
+    proposal = await call_tool(mcp, "update_project", project_id="p1", project_name="renamed")
+    result = await call_tool(
+        mcp, "confirm_operation",
+        token=proposal["confirmation_token"], operation_hash=proposal["operation_hash"],
+    )
     assert result["name"] == "renamed"
 
 

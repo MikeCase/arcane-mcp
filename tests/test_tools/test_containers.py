@@ -55,7 +55,7 @@ async def test_inspect_container(mcp: Any, httpx_mock: Any) -> None:
         json={"id": "c1", "name": "web", "config": {}},
     )
     result = await call_tool(mcp, "inspect_container", container_id="c1")
-    assert result["id"] == "c1"
+    assert result["data"]["id"] == "c1"
 
 
 # ── start / stop / restart ────────────────────────────────────────────
@@ -105,7 +105,7 @@ async def test_remove_container_needs_confirm(mcp: Any, httpx_mock: Any) -> None
     """remove_container returns warning when confirm=False."""
     result = await call_tool(mcp, "remove_container", container_id="c1")
     assert "warning" in result
-    assert result["container_id"] == "c1"
+    assert result["target"] == "c1"
 
 
 @pytest.mark.asyncio
@@ -116,7 +116,11 @@ async def test_remove_container_confirmed(mcp: Any, httpx_mock: Any) -> None:
         method="DELETE",
         json={"message": "removed"},
     )
-    result = await call_tool(mcp, "remove_container", container_id="c1", confirm=True)
+    proposal = await call_tool(mcp, "remove_container", container_id="c1")
+    result = await call_tool(
+        mcp, "confirm_operation",
+        token=proposal["confirmation_token"], operation_hash=proposal["operation_hash"],
+    )
     assert result == {"message": "removed"}
 
 

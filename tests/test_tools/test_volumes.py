@@ -55,9 +55,13 @@ async def test_remove_volume_needs_confirm(mcp: Any, httpx_mock: Any) -> None:
 async def test_remove_volume_confirmed(mcp: Any, httpx_mock: Any) -> None:
     """remove_volume executes when confirmed."""
     httpx_mock.add_response(
-        url="http://localhost:3552/api/agents/0/volumes/my-vol",
+        url="http://localhost:3552/api/agents/0/volumes/my-vol?force=false",
         method="DELETE",
         json={"message": "removed"},
     )
-    result = await call_tool(mcp, "remove_volume", name="my-vol", confirm=True)
+    proposal = await call_tool(mcp, "remove_volume", name="my-vol")
+    result = await call_tool(
+        mcp, "confirm_operation",
+        token=proposal["confirmation_token"], operation_hash=proposal["operation_hash"],
+    )
     assert result == {"message": "removed"}

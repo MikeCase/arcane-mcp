@@ -12,6 +12,7 @@ from arcane_mcp.tools import (
     environments,
     images,
     networks,
+    operations,
     projects,
     system,
     volumes,
@@ -26,6 +27,15 @@ def setup_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ARCANE_API_KEY", "test-key-abc123")
 
 
+@pytest.fixture(autouse=True)
+def isolated_audit_log(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
+    """Write the safety audit log to a temp file instead of ~/.arcane-mcp-audit.log."""
+    import arcane_mcp.safety as safety_mod
+
+    monkeypatch.setenv("ARCANE_MCP_AUDIT_LOG", str(tmp_path / "audit.log"))
+    monkeypatch.setattr(safety_mod, "_audit_log", None)
+
+
 @pytest.fixture
 def mcp() -> FastMCP:
     """Return a FastMCP instance with all tools registered."""
@@ -34,6 +44,7 @@ def mcp() -> FastMCP:
     environments.register(mcp)
     images.register(mcp)
     networks.register(mcp)
+    operations.register(mcp)
     projects.register(mcp)
     system.register(mcp)
     volumes.register(mcp)

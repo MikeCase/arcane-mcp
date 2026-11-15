@@ -75,7 +75,7 @@ def register(mcp: FastMCP) -> None:
             env_id=env_id,
             agent_token=agent_token,
         )
-        op_hash = compute_operation_hash("remove_network", network_id, None, None)
+        op_hash = compute_operation_hash("remove_network", f"network:{network_id}", None, None)
         return {
             "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
             "confirmation_token": token,

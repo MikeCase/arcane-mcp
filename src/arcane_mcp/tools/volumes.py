@@ -79,12 +79,12 @@ def register(mcp: FastMCP) -> None:
             target=f"volume:{name}",
             endpoint=f"/api/agents/{env_id}/volumes/{name}",
             method="DELETE",
-            body={"force": str(force).lower()},
+            params={"force": str(force).lower()},
             classification=ToolClass.DESTRUCTIVE_WRITE,
             env_id=env_id,
             agent_token=agent_token,
         )
-        op_hash = compute_operation_hash("remove_volume", name, {"force": str(force).lower()}, None)
+        op_hash = compute_operation_hash("remove_volume", f"volume:{name}", None, {"force": str(force).lower()})
         return {
             "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
             "confirmation_token": token,
@@ -223,7 +223,9 @@ def register(mcp: FastMCP) -> None:
             env_id=env_id,
             agent_token=agent_token,
         )
-        op_hash = compute_operation_hash("restore_volume_backup", volume_name, None, {"action": "restore"})
+        op_hash = compute_operation_hash(
+            "restore_volume_backup", f"volume:{volume_name}/backup:{backup_id}", None, {"action": "restore"}
+        )
         return {
             "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
             "confirmation_token": token,
@@ -248,7 +250,7 @@ def register(mcp: FastMCP) -> None:
             env_id=env_id,
             agent_token=agent_token,
         )
-        op_hash = compute_operation_hash("delete_volume_backup", backup_id, None, None)
+        op_hash = compute_operation_hash("delete_volume_backup", f"backup:{backup_id}", None, None)
         return {
             "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
             "confirmation_token": token,
