@@ -38,7 +38,7 @@ def register(mcp: FastMCP) -> None:
     async def list_projects(env_id: str = "0", agent_token: str | None = None) -> Any:
         """List all Compose projects in the given environment."""
         client = require_client()
-        url = f"/api/environments/{env_id}/projects"
+        url = f"/api/agents/{env_id}/projects"
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -54,7 +54,7 @@ def register(mcp: FastMCP) -> None:
     async def get_project(project_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Get details of a specific Compose project."""
         client = require_client()
-        url = f"/api/environments/{env_id}/projects/{project_id}"
+        url = f"/api/agents/{env_id}/projects/{project_id}"
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -73,7 +73,7 @@ def register(mcp: FastMCP) -> None:
         token = get_token_store().create(
             action="deploy_project",
             target=project_name,
-            endpoint=f"/api/environments/{env_id}/projects",
+            endpoint=f"/api/agents/{env_id}/projects",
             method="POST",
             body={"compose": compose_content, "name": project_name},
             params=None,
@@ -99,9 +99,9 @@ def register(mcp: FastMCP) -> None:
     async def redeploy_project(project_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Redeploy a Compose project."""
         client = require_client()
-        url = f"/api/environments/{env_id}/projects/{project_id}/redeploy"
+        url = f"/api/agents/{env_id}/projects/{project_id}/deploy"
         try:
-            resp = await client.post(url, headers=_build_headers(agent_token))
+            resp = await client.post(url, params={"action": "redeploy"}, headers=_build_headers(agent_token))
             resp.raise_for_status()
             return resp.json()
         except httpx.HTTPStatusError as e:
@@ -117,7 +117,7 @@ def register(mcp: FastMCP) -> None:
         token = get_token_store().create(
             action="remove_project",
             target=project_id,
-            endpoint=f"/api/environments/{env_id}/projects/{project_id}",
+            endpoint=f"/api/agents/{env_id}/projects/{project_id}",
             method="DELETE",
             body=None,
             params=None,
@@ -154,8 +154,8 @@ def register(mcp: FastMCP) -> None:
         token = get_token_store().create(
             action="update_project",
             target=project_id,
-            endpoint=f"/api/environments/{env_id}/projects/{project_id}",
-            method="PUT",
+            endpoint=f"/api/agents/{env_id}/projects/{project_id}",
+            method="PATCH",
             body=payload,
             params=None,
             classification=ToolClass.DESTRUCTIVE_WRITE,
@@ -180,7 +180,7 @@ def register(mcp: FastMCP) -> None:
     async def get_project_counts(env_id: str = "0", agent_token: str | None = None) -> Any:
         """Get counts of Compose projects in the given environment."""
         client = require_client()
-        url = f"/api/environments/{env_id}/projects/counts"
+        url = f"/api/agents/{env_id}/projects/counts"
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -198,10 +198,10 @@ def register(mcp: FastMCP) -> None:
         token = get_token_store().create(
             action="project_down",
             target=project_id,
-            endpoint=f"/api/environments/{env_id}/projects/{project_id}/down",
+            endpoint=f"/api/agents/{env_id}/projects/{project_id}",
             method="POST",
             body=None,
-            params=None,
+            params={"action": "down"},
             classification=ToolClass.DESTRUCTIVE_WRITE,
             env_id=env_id,
             agent_token=agent_token,
@@ -210,7 +210,7 @@ def register(mcp: FastMCP) -> None:
             "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
             "confirmation_token": token,
             "classification": ToolClass.DESTRUCTIVE_WRITE,
-            "operation_hash": compute_operation_hash("project_down", project_id, None, None),
+            "operation_hash": compute_operation_hash("project_down", project_id, None, {"action": "down"}),
             "target": project_id,
             "action": "project_down",
         }
@@ -221,10 +221,10 @@ def register(mcp: FastMCP) -> None:
         token = get_token_store().create(
             action="restart_project",
             target=project_id,
-            endpoint=f"/api/environments/{env_id}/projects/{project_id}/restart",
+            endpoint=f"/api/agents/{env_id}/projects/{project_id}",
             method="POST",
             body=None,
-            params=None,
+            params={"action": "restart"},
             classification=ToolClass.DESTRUCTIVE_WRITE,
             env_id=env_id,
             agent_token=agent_token,
@@ -233,7 +233,7 @@ def register(mcp: FastMCP) -> None:
             "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
             "confirmation_token": token,
             "classification": ToolClass.DESTRUCTIVE_WRITE,
-            "operation_hash": compute_operation_hash("restart_project", project_id, None, None),
+            "operation_hash": compute_operation_hash("restart_project", project_id, None, {"action": "restart"}),
             "target": project_id,
             "action": "restart_project",
         }
@@ -242,7 +242,7 @@ def register(mcp: FastMCP) -> None:
     async def build_project(project_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Build a Compose project's images."""
         client = require_client()
-        url = f"/api/environments/{env_id}/projects/{project_id}/build"
+        url = f"/api/agents/{env_id}/projects/{project_id}/build"
         try:
             resp = await client.post(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -258,9 +258,9 @@ def register(mcp: FastMCP) -> None:
     async def archive_project(project_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Archive a Compose project."""
         client = require_client()
-        url = f"/api/environments/{env_id}/projects/{project_id}/archive"
+        url = f"/api/agents/{env_id}/projects/{project_id}"
         try:
-            resp = await client.post(url, headers=_build_headers(agent_token))
+            resp = await client.post(url, params={"action": "archive"}, headers=_build_headers(agent_token))
             resp.raise_for_status()
             return resp.json()
         except httpx.HTTPStatusError as e:
@@ -274,9 +274,9 @@ def register(mcp: FastMCP) -> None:
     async def unarchive_project(project_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Unarchive a Compose project."""
         client = require_client()
-        url = f"/api/environments/{env_id}/projects/{project_id}/unarchive"
+        url = f"/api/agents/{env_id}/projects/{project_id}"
         try:
-            resp = await client.post(url, headers=_build_headers(agent_token))
+            resp = await client.post(url, params={"action": "unarchive"}, headers=_build_headers(agent_token))
             resp.raise_for_status()
             return resp.json()
         except httpx.HTTPStatusError as e:
@@ -290,9 +290,9 @@ def register(mcp: FastMCP) -> None:
     async def pull_project_images(project_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Pull images for a Compose project."""
         client = require_client()
-        url = f"/api/environments/{env_id}/projects/{project_id}/pull"
+        url = f"/api/agents/{env_id}/projects/{project_id}/deploy"
         try:
-            resp = await client.post(url, headers=_build_headers(agent_token))
+            resp = await client.post(url, params={"action": "pull"}, headers=_build_headers(agent_token))
             resp.raise_for_status()
             return resp.json()
         except httpx.HTTPStatusError as e:
@@ -306,7 +306,7 @@ def register(mcp: FastMCP) -> None:
     async def get_project_compose(project_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Get the Compose file content for a project."""
         client = require_client()
-        url = f"/api/environments/{env_id}/projects/{project_id}/compose"
+        url = f"/api/agents/{env_id}/projects/{project_id}/compose"
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -324,12 +324,15 @@ def register(mcp: FastMCP) -> None:
             return {"error": str(e)}
 
     @mcp.tool()
-    async def get_project_file(project_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
-        """Get the project file content for a Compose project."""
+    async def get_project_file(
+        project_id: str, relative_path: str = "compose.yaml", env_id: str = "0", agent_token: str | None = None
+    ) -> Any:
+        """Get the content of a file in a Compose project's workspace (path relative to the project directory)."""
         client = require_client()
-        url = f"/api/environments/{env_id}/projects/{project_id}/file"
+        url = f"/api/agents/{env_id}/projects/{project_id}/workspace/file"
+        params = {"relativePath": relative_path.lstrip("/")}
         try:
-            resp = await client.get(url, headers=_build_headers(agent_token))
+            resp = await client.get(url, params=params, headers=_build_headers(agent_token))
             resp.raise_for_status()
             result = resp.json()
             return {
@@ -348,9 +351,9 @@ def register(mcp: FastMCP) -> None:
     async def update_project_services(project_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Update services of a Compose project from the current compose config."""
         client = require_client()
-        url = f"/api/environments/{env_id}/projects/{project_id}/update-services"
+        url = f"/api/agents/{env_id}/projects/{project_id}"
         try:
-            resp = await client.post(url, headers=_build_headers(agent_token))
+            resp = await client.post(url, params={"action": "updateservices"}, headers=_build_headers(agent_token))
             resp.raise_for_status()
             return resp.json()
         except httpx.HTTPStatusError as e:
@@ -364,7 +367,7 @@ def register(mcp: FastMCP) -> None:
     async def get_project_runtime(project_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Get the runtime info for a Compose project."""
         client = require_client()
-        url = f"/api/environments/{env_id}/projects/{project_id}/runtime"
+        url = f"/api/agents/{env_id}/projects/{project_id}/runtime"
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()

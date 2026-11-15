@@ -17,7 +17,7 @@ def register(mcp: FastMCP) -> None:
     async def list_ports(env_id: str = "0", agent_token: str | None = None) -> Any:
         """List all port mappings for the given environment."""
         client = require_client()
-        url = f"/api/environments/{env_id}/ports"
+        url = f"/api/agents/{env_id}/ports"
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()

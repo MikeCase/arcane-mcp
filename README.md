@@ -6,6 +6,14 @@ Covers the core Docker management API: containers, images, volumes, networks, Co
 
 **125 tools across 14 modules.**
 
+## Requirements
+
+**Arcane >= 3.0.** Arcane 3 moved every per-environment route from `/api/environments/{id}/…` to `/api/agents/{id}/…`, turned most lifecycle endpoints into `?action=` calls (e.g. `POST /api/agents/{id}/containers/{cid}?action=start`), moved image-update checks to `/api/agents/{id}/images/updates/…` and registries to `/api/registries`. Arcane 2.x is no longer supported; use a commit before the v3 port for it.
+
+API-key permissions keep their names for the read tools (`projects:list`, `containers:list`, `containers:logs`, `images:list`, `networks:list`, `volumes:list`; `list_environments` returns every environment the key holds any permission on). The v3 upgrade migrates the renamed ones in existing keys automatically: `events:read` → `events:list`, `image-updates:read` → `image-updates:list` + `image-updates:read`, `activities:read` → `activities:list` + `activities:read`. Note that the same migration also grants `image-updates:apply` (which can update containers) to every key that had `image-updates:check`.
+
+Not available on Arcane 3 (the tools return an explanatory error instead of calling the API): `create_volume_directory`, `upload_to_volume`, `delete_volume_file` (volume writes now go through a multipart workspace manifest) and `exec_in_container` (no REST exec route). `browse_volume` and `read_volume_file` use the new volume workspace routes; `get_project_file` reads any file in the project workspace via `relative_path` (default `compose.yaml`).
+
 ## Install
 
 Not on PyPI. Install directly from GitHub:

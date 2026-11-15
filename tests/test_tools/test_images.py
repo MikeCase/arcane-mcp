@@ -12,7 +12,7 @@ from tests.conftest import call_tool
 async def test_list_images(mcp: Any, httpx_mock: Any) -> None:
     """list_images returns images list."""
     httpx_mock.add_response(
-        url="http://localhost:3552/api/environments/0/images",
+        url="http://localhost:3552/api/agents/0/images",
         method="GET",
         json=[{"id": "img1", "repo": "nginx"}],
     )
@@ -24,7 +24,7 @@ async def test_list_images(mcp: Any, httpx_mock: Any) -> None:
 async def test_pull_image(mcp: Any, httpx_mock: Any) -> None:
     """pull_image sends pull request."""
     httpx_mock.add_response(
-        url="http://localhost:3552/api/environments/0/images/pull",
+        url="http://localhost:3552/api/agents/0/images/pull",
         method="POST",
         json={"status": "pulling"},
     )
@@ -43,7 +43,7 @@ async def test_remove_image_needs_confirm(mcp: Any, httpx_mock: Any) -> None:
 async def test_remove_image_confirmed(mcp: Any, httpx_mock: Any) -> None:
     """remove_image executes when confirmed."""
     httpx_mock.add_response(
-        url="http://localhost:3552/api/environments/0/images/img1",
+        url="http://localhost:3552/api/agents/0/images/img1",
         method="DELETE",
         json={"message": "removed"},
     )
@@ -55,7 +55,7 @@ async def test_remove_image_confirmed(mcp: Any, httpx_mock: Any) -> None:
 async def test_inspect_image(mcp: Any, httpx_mock: Any) -> None:
     """inspect_image returns image details."""
     httpx_mock.add_response(
-        url="http://localhost:3552/api/environments/0/images/img1",
+        url="http://localhost:3552/api/agents/0/images/img1",
         method="GET",
         json={"id": "img1", "repo": "nginx"},
     )
@@ -67,7 +67,7 @@ async def test_inspect_image(mcp: Any, httpx_mock: Any) -> None:
 async def test_tag_image(mcp: Any, httpx_mock: Any) -> None:
     """tag_image tags an existing image."""
     httpx_mock.add_response(
-        url="http://localhost:3552/api/environments/0/images/img1/tag",
+        url="http://localhost:3552/api/agents/0/images/img1/tag",
         method="POST",
         json={"message": "tagged"},
     )

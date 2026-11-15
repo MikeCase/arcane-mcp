@@ -20,7 +20,7 @@ def register(mcp: FastMCP) -> None:
         token = get_token_store().create(
             action="run_updater",
             target=env_id,
-            endpoint=f"/api/environments/{env_id}/updater/run",
+            endpoint=f"/api/agents/{env_id}/updater/run",
             method="POST",
             body=None,
             params=None,
@@ -34,7 +34,7 @@ def register(mcp: FastMCP) -> None:
     async def get_updater_status(env_id: str = "0", agent_token: str | None = None) -> Any:
         """Get the current updater status."""
         client = require_client()
-        url = f"/api/environments/{env_id}/updater/status"
+        url = f"/api/agents/{env_id}/updater/status"
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -50,7 +50,7 @@ def register(mcp: FastMCP) -> None:
     async def get_updater_history(env_id: str = "0", agent_token: str | None = None) -> Any:
         """Get updater operation history."""
         client = require_client()
-        url = f"/api/environments/{env_id}/updater/history"
+        url = f"/api/agents/{env_id}/updater/history"
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()

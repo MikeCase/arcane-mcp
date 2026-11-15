@@ -14,7 +14,7 @@ from tests.conftest import call_tool
 async def test_list_containers(mcp: Any, httpx_mock: Any) -> None:
     """List containers returns parsed JSON."""
     httpx_mock.add_response(
-        url="http://localhost:3552/api/environments/0/containers?all=false",
+        url="http://localhost:3552/api/agents/0/containers?all=false",
         method="GET",
         json=[{"id": "c1", "name": "web", "status": "running"}],
     )
@@ -26,7 +26,7 @@ async def test_list_containers(mcp: Any, httpx_mock: Any) -> None:
 async def test_list_containers_all(mcp: Any, httpx_mock: Any) -> None:
     """list_containers passes the all flag."""
     httpx_mock.add_response(
-        url="http://localhost:3552/api/environments/0/containers?all=true",
+        url="http://localhost:3552/api/agents/0/containers?all=true",
         method="GET",
         json=[],
     )
@@ -50,7 +50,7 @@ async def test_list_containers_http_error(mcp: Any, httpx_mock: Any) -> None:
 async def test_inspect_container(mcp: Any, httpx_mock: Any) -> None:
     """inspect_container returns container details."""
     httpx_mock.add_response(
-        url="http://localhost:3552/api/environments/0/containers/c1",
+        url="http://localhost:3552/api/agents/0/containers/c1",
         method="GET",
         json={"id": "c1", "name": "web", "config": {}},
     )
@@ -65,7 +65,7 @@ async def test_inspect_container(mcp: Any, httpx_mock: Any) -> None:
 async def test_start_container(mcp: Any, httpx_mock: Any) -> None:
     """start_container posts to the start endpoint."""
     httpx_mock.add_response(
-        url="http://localhost:3552/api/environments/0/containers/c1/start",
+        url="http://localhost:3552/api/agents/0/containers/c1?action=start",
         method="POST",
         json={"message": "started"},
     )
@@ -77,7 +77,7 @@ async def test_start_container(mcp: Any, httpx_mock: Any) -> None:
 async def test_stop_container(mcp: Any, httpx_mock: Any) -> None:
     """stop_container posts with timeout."""
     httpx_mock.add_response(
-        url="http://localhost:3552/api/environments/0/containers/c1/stop",
+        url="http://localhost:3552/api/agents/0/containers/c1?action=stop",
         method="POST",
         json={"message": "stopped"},
     )
@@ -89,7 +89,7 @@ async def test_stop_container(mcp: Any, httpx_mock: Any) -> None:
 async def test_restart_container(mcp: Any, httpx_mock: Any) -> None:
     """restart_container posts with timeout."""
     httpx_mock.add_response(
-        url="http://localhost:3552/api/environments/0/containers/c1/restart",
+        url="http://localhost:3552/api/agents/0/containers/c1?action=restart",
         method="POST",
         json={"message": "restarted"},
     )
@@ -112,7 +112,7 @@ async def test_remove_container_needs_confirm(mcp: Any, httpx_mock: Any) -> None
 async def test_remove_container_confirmed(mcp: Any, httpx_mock: Any) -> None:
     """remove_container executes when confirm=True."""
     httpx_mock.add_response(
-        url="http://localhost:3552/api/environments/0/containers/c1?force=false",
+        url="http://localhost:3552/api/agents/0/containers/c1?force=false",
         method="DELETE",
         json={"message": "removed"},
     )
@@ -127,7 +127,7 @@ async def test_remove_container_confirmed(mcp: Any, httpx_mock: Any) -> None:
 async def test_create_container(mcp: Any, httpx_mock: Any) -> None:
     """create_container posts with image and name."""
     httpx_mock.add_response(
-        url="http://localhost:3552/api/environments/0/containers",
+        url="http://localhost:3552/api/agents/0/containers",
         method="POST",
         json={"id": "new-container"},
     )
@@ -142,7 +142,7 @@ async def test_create_container(mcp: Any, httpx_mock: Any) -> None:
 async def test_exec_in_container(mcp: Any, httpx_mock: Any) -> None:
     """exec_in_container sends command payload."""
     httpx_mock.add_response(
-        url="http://localhost:3552/api/environments/0/containers/c1/exec",
+        url="http://localhost:3552/api/agents/0/containers/c1/exec",
         method="POST",
         json={"output": "hello world"},
     )
@@ -153,7 +153,7 @@ async def test_exec_in_container(mcp: Any, httpx_mock: Any) -> None:
 # ── get_container_logs ────────────────────────────────────────────────
 
 
-LOG_URL = "http://localhost:3552/api/environments/0/containers/c1/logs/download"
+LOG_URL = "http://localhost:3552/api/agents/0/containers/c1/logs/download"
 LOG_TEXT = "a info start\nb ERROR boom\nc info tick\nd error again\ne info tick\n"
 
 
@@ -201,7 +201,7 @@ async def test_get_container_processes(mcp: Any, httpx_mock: Any) -> None:
     """get_container_processes returns the process snapshot."""
     payload = {"success": True, "data": {"titles": ["PID", "%MEM"], "processes": [["1", "12.3"]]}}
     httpx_mock.add_response(
-        url="http://localhost:3552/api/environments/0/containers/c1/processes",
+        url="http://localhost:3552/api/agents/0/containers/c1/processes",
         method="GET",
         json=payload,
     )

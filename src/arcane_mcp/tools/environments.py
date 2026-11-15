@@ -18,7 +18,7 @@ def register(mcp: FastMCP) -> None:
     async def list_environments() -> Any:
         """List all environments (local + remote agents)."""
         client = require_client()
-        url = "/api/environments"
+        url = "/api/agents"
         try:
             resp = await client.get(url)
             resp.raise_for_status()
@@ -34,7 +34,7 @@ def register(mcp: FastMCP) -> None:
     async def get_environment(env_id: str) -> Any:
         """Get details of a specific environment."""
         client = require_client()
-        url = f"/api/environments/{env_id}"
+        url = f"/api/agents/{env_id}"
         try:
             resp = await client.get(url)
             resp.raise_for_status()
@@ -55,7 +55,7 @@ def register(mcp: FastMCP) -> None:
     async def create_environment(name: str, api_url: str, agent_token: str) -> Any:
         """Register a new remote agent environment."""
         client = require_client()
-        url = "/api/environments"
+        url = "/api/agents"
         payload = {"name": name, "apiUrl": api_url, "accessToken": agent_token}
         try:
             resp = await client.post(url, json=payload)
@@ -72,7 +72,7 @@ def register(mcp: FastMCP) -> None:
     async def update_environment(env_id: str, name: str | None = None, api_url: str | None = None, agent_token: str | None = None) -> Any:
         """Update environment settings (name, API URL, or access token)."""
         client = require_client()
-        url = f"/api/environments/{env_id}"
+        url = f"/api/agents/{env_id}"
         payload: dict[str, Any] = {}
         if name is not None:
             payload["name"] = name
@@ -81,7 +81,7 @@ def register(mcp: FastMCP) -> None:
         if agent_token is not None:
             payload["accessToken"] = agent_token
         try:
-            resp = await client.put(url, json=payload)
+            resp = await client.patch(url, json=payload)
             resp.raise_for_status()
             return resp.json()
         except httpx.HTTPStatusError as e:
@@ -97,7 +97,7 @@ def register(mcp: FastMCP) -> None:
         token = get_token_store().create(
             action="remove_environment",
             target=env_id,
-            endpoint=f"/api/environments/{env_id}",
+            endpoint=f"/api/agents/{env_id}",
             method="DELETE",
             body=None,
             params=None,

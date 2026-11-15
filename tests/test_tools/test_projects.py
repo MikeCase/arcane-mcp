@@ -12,7 +12,7 @@ from tests.conftest import call_tool
 async def test_list_projects(mcp: Any, httpx_mock: Any) -> None:
     """list_projects returns projects list."""
     httpx_mock.add_response(
-        url="http://localhost:3552/api/environments/0/projects",
+        url="http://localhost:3552/api/agents/0/projects",
         method="GET",
         json=[{"id": "p1", "name": "myapp"}],
     )
@@ -24,7 +24,7 @@ async def test_list_projects(mcp: Any, httpx_mock: Any) -> None:
 async def test_get_project(mcp: Any, httpx_mock: Any) -> None:
     """get_project returns project details."""
     httpx_mock.add_response(
-        url="http://localhost:3552/api/environments/0/projects/p1",
+        url="http://localhost:3552/api/agents/0/projects/p1",
         method="GET",
         json={"id": "p1", "name": "myapp"},
     )
@@ -36,7 +36,7 @@ async def test_get_project(mcp: Any, httpx_mock: Any) -> None:
 async def test_deploy_project(mcp: Any, httpx_mock: Any) -> None:
     """deploy_project posts compose content."""
     httpx_mock.add_response(
-        url="http://localhost:3552/api/environments/0/projects",
+        url="http://localhost:3552/api/agents/0/projects",
         method="POST",
         json={"id": "p1", "name": "myapp"},
     )
@@ -48,7 +48,7 @@ async def test_deploy_project(mcp: Any, httpx_mock: Any) -> None:
 async def test_redeploy_project(mcp: Any, httpx_mock: Any) -> None:
     """redeploy_project posts to redeploy endpoint."""
     httpx_mock.add_response(
-        url="http://localhost:3552/api/environments/0/projects/p1/redeploy",
+        url="http://localhost:3552/api/agents/0/projects/p1/deploy?action=redeploy",
         method="POST",
         json={"message": "redeployed"},
     )
@@ -67,7 +67,7 @@ async def test_remove_project_needs_confirm(mcp: Any, httpx_mock: Any) -> None:
 async def test_remove_project_confirmed(mcp: Any, httpx_mock: Any) -> None:
     """remove_project executes when confirmed."""
     httpx_mock.add_response(
-        url="http://localhost:3552/api/environments/0/projects/p1",
+        url="http://localhost:3552/api/agents/0/projects/p1",
         method="DELETE",
         json={"message": "removed"},
     )
@@ -79,8 +79,8 @@ async def test_remove_project_confirmed(mcp: Any, httpx_mock: Any) -> None:
 async def test_update_project(mcp: Any, httpx_mock: Any) -> None:
     """update_project sends partial update."""
     httpx_mock.add_response(
-        url="http://localhost:3552/api/environments/0/projects/p1",
-        method="PUT",
+        url="http://localhost:3552/api/agents/0/projects/p1",
+        method="PATCH",
         json={"id": "p1", "name": "renamed"},
     )
     result = await call_tool(mcp, "update_project", project_id="p1", project_name="renamed")

@@ -18,7 +18,7 @@ def register(mcp: FastMCP) -> None:
     async def list_activities(env_id: str = "0", agent_token: str | None = None) -> Any:
         """List current and recent background activities for an environment."""
         client = require_client()
-        url = f"/api/environments/{env_id}/activities"
+        url = f"/api/agents/{env_id}/activities"
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -34,7 +34,7 @@ def register(mcp: FastMCP) -> None:
     async def get_activity(activity_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Get a specific background activity."""
         client = require_client()
-        url = f"/api/environments/{env_id}/activities/{activity_id}"
+        url = f"/api/agents/{env_id}/activities/{activity_id}"
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -50,9 +50,9 @@ def register(mcp: FastMCP) -> None:
     async def cancel_activity(activity_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Cancel a running background activity."""
         client = require_client()
-        url = f"/api/environments/{env_id}/activities/{activity_id}/cancel"
+        url = f"/api/agents/{env_id}/activities/{activity_id}"
         try:
-            resp = await client.post(url, headers=_build_headers(agent_token))
+            resp = await client.post(url, params={"action": "cancel"}, headers=_build_headers(agent_token))
             resp.raise_for_status()
             return resp.json()
         except httpx.HTTPStatusError as e:
@@ -70,7 +70,7 @@ def register(mcp: FastMCP) -> None:
         token = get_token_store().create(
             action="clear_activity_history",
             target=env_id,
-            endpoint=f"/api/environments/{env_id}/activities/history",
+            endpoint=f"/api/agents/{env_id}/activities/history",
             method="DELETE",
             body=None,
             params=None,
@@ -100,7 +100,7 @@ def register(mcp: FastMCP) -> None:
     async def get_environment_events(environment_id: str, agent_token: str | None = None) -> Any:
         """Get events for a specific environment."""
         client = require_client()
-        url = f"/api/events/environment/{environment_id}"
+        url = f"/api/events/agent/{environment_id}"
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()

@@ -12,7 +12,7 @@ from tests.conftest import call_tool
 async def test_list_volumes(mcp: Any, httpx_mock: Any) -> None:
     """list_volumes returns volumes list."""
     httpx_mock.add_response(
-        url="http://localhost:3552/api/environments/0/volumes",
+        url="http://localhost:3552/api/agents/0/volumes",
         method="GET",
         json=[{"name": "data-vol", "driver": "local"}],
     )
@@ -24,7 +24,7 @@ async def test_list_volumes(mcp: Any, httpx_mock: Any) -> None:
 async def test_create_volume(mcp: Any, httpx_mock: Any) -> None:
     """create_volume posts with name and driver."""
     httpx_mock.add_response(
-        url="http://localhost:3552/api/environments/0/volumes",
+        url="http://localhost:3552/api/agents/0/volumes",
         method="POST",
         json={"name": "my-vol", "driver": "local"},
     )
@@ -36,7 +36,7 @@ async def test_create_volume(mcp: Any, httpx_mock: Any) -> None:
 async def test_inspect_volume(mcp: Any, httpx_mock: Any) -> None:
     """inspect_volume returns volume details."""
     httpx_mock.add_response(
-        url="http://localhost:3552/api/environments/0/volumes/my-vol",
+        url="http://localhost:3552/api/agents/0/volumes/my-vol",
         method="GET",
         json={"name": "my-vol", "mountpoint": "/data"},
     )
@@ -55,7 +55,7 @@ async def test_remove_volume_needs_confirm(mcp: Any, httpx_mock: Any) -> None:
 async def test_remove_volume_confirmed(mcp: Any, httpx_mock: Any) -> None:
     """remove_volume executes when confirmed."""
     httpx_mock.add_response(
-        url="http://localhost:3552/api/environments/0/volumes/my-vol",
+        url="http://localhost:3552/api/agents/0/volumes/my-vol",
         method="DELETE",
         json={"message": "removed"},
     )

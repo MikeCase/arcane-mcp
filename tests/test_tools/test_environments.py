@@ -12,7 +12,7 @@ from tests.conftest import call_tool
 async def test_list_environments(mcp: Any, httpx_mock: Any) -> None:
     """list_environments returns environments list."""
     httpx_mock.add_response(
-        url="http://localhost:3552/api/environments",
+        url="http://localhost:3552/api/agents",
         method="GET",
         json=[{"id": "0", "name": "local"}, {"id": "uuid-1", "name": "remote"}],
     )
@@ -24,7 +24,7 @@ async def test_list_environments(mcp: Any, httpx_mock: Any) -> None:
 async def test_get_environment(mcp: Any, httpx_mock: Any) -> None:
     """get_environment returns a single environment."""
     httpx_mock.add_response(
-        url="http://localhost:3552/api/environments/0",
+        url="http://localhost:3552/api/agents/0",
         method="GET",
         json={"id": "0", "name": "local"},
     )
@@ -36,7 +36,7 @@ async def test_get_environment(mcp: Any, httpx_mock: Any) -> None:
 async def test_create_environment(mcp: Any, httpx_mock: Any) -> None:
     """create_environment registers a remote agent."""
     httpx_mock.add_response(
-        url="http://localhost:3552/api/environments",
+        url="http://localhost:3552/api/agents",
         method="POST",
         json={"id": "new-uuid", "name": "staging"},
     )
@@ -54,8 +54,8 @@ async def test_create_environment(mcp: Any, httpx_mock: Any) -> None:
 async def test_update_environment(mcp: Any, httpx_mock: Any) -> None:
     """update_environment sends partial update."""
     httpx_mock.add_response(
-        url="http://localhost:3552/api/environments/0",
-        method="PUT",
+        url="http://localhost:3552/api/agents/0",
+        method="PATCH",
         json={"id": "0", "name": "renamed"},
     )
     result = await call_tool(mcp, "update_environment", env_id="0", name="renamed")
@@ -73,7 +73,7 @@ async def test_remove_environment_needs_confirm(mcp: Any, httpx_mock: Any) -> No
 async def test_remove_environment_confirmed(mcp: Any, httpx_mock: Any) -> None:
     """remove_environment executes when confirmed."""
     httpx_mock.add_response(
-        url="http://localhost:3552/api/environments/0",
+        url="http://localhost:3552/api/agents/0",
         method="DELETE",
         json={"message": "removed"},
     )

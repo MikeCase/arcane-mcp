@@ -35,7 +35,7 @@ def register(mcp: FastMCP) -> None:
     async def list_webhooks(env_id: str = "0", agent_token: str | None = None) -> Any:
         """List all webhooks for the given environment."""
         client = require_client()
-        url = f"/api/environments/{env_id}/webhooks"
+        url = f"/api/agents/{env_id}/webhooks"
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -53,7 +53,7 @@ def register(mcp: FastMCP) -> None:
     ) -> Any:
         """Create a new webhook in the given environment."""
         client = require_client()
-        api_url = f"/api/environments/{env_id}/webhooks"
+        api_url = f"/api/agents/{env_id}/webhooks"
         body: dict[str, Any] = {"name": name, "url": url}
         try:
             resp = await client.post(api_url, json=body, headers=_build_headers(agent_token))
@@ -72,7 +72,7 @@ def register(mcp: FastMCP) -> None:
     ) -> Any:
         """Enable or disable a webhook."""
         client = require_client()
-        api_url = f"/api/environments/{env_id}/webhooks/{webhook_id}"
+        api_url = f"/api/agents/{env_id}/webhooks/{webhook_id}"
         body = {"enabled": enabled}
         try:
             resp = await client.patch(api_url, json=body, headers=_build_headers(agent_token))
@@ -94,7 +94,7 @@ def register(mcp: FastMCP) -> None:
         token = get_token_store().create(
             action="delete_webhook",
             target=webhook_id,
-            endpoint=f"/api/environments/{env_id}/webhooks/{webhook_id}",
+            endpoint=f"/api/agents/{env_id}/webhooks/{webhook_id}",
             method="DELETE",
             body=None,
             params=None,
