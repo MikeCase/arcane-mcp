@@ -3,7 +3,7 @@
 MCP server that exposes the [Arcane API](https://getarcane.app/api-reference) to AI agents.
 Built with **FastMCP (Python)** and managed with **UV**.
 
-**Status:** Active development. 125 tools across 14 categories covering all major Arcane API endpoints.
+**Status:** Active development. 127 tools across 14 categories covering all major Arcane API endpoints.
 
 ---
 

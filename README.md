@@ -4,7 +4,7 @@ An MCP server that exposes [Arcane](https://getarcane.app) Docker management cap
 
 Covers the core Docker management API: containers, images, volumes, networks, Compose projects, registries, vulnerability scanning, port mappings, webhooks, system management, updater, activities/events, and environment management.
 
-**125 tools across 14 modules.**
+**127 tools across 14 modules.**
 
 ## Install
 
@@ -53,7 +53,7 @@ Add to your `opencode.json`:
 
 Or set environment variables globally and omit them from the config.
 
-## Tools (125 total)
+## Tools (127 total)
 
 ### Containers (18)
 list_containers, inspect_container, create_container, start_container, stop_container, restart_container, kill_container, pause_container, unpause_container, remove_container, redeploy_container, commit_container, update_container, set_container_auto_update, exec_in_container, get_container_logs, get_container_stats, get_container_counts
@@ -94,8 +94,8 @@ run_updater, get_updater_status, get_updater_history
 ### Ports (1)
 list_ports
 
-### Operations / Safety (2)
-confirm_operation, read_audit_log
+### Operations / Safety (4)
+confirm_operation, read_audit_log, get_operation_status, classify_tool
 
 ## Usage
 
