@@ -62,14 +62,18 @@ async def test_get_project(mcp: Any, httpx_mock: Any) -> None:
 
 @pytest.mark.asyncio
 async def test_redeploy_project(mcp: Any, httpx_mock: Any) -> None:
-    """redeploy_project posts to redeploy endpoint."""
+    """redeploy_project posts to redeploy endpoint and parses the action stream."""
     httpx_mock.add_response(
         url="http://localhost:3552/api/environments/0/projects/p1/redeploy",
         method="POST",
-        json={"message": "redeployed"},
+        content=b'{"activityId":"a1","type":"activity"}\n{"log":"recreated"}\n{"done":true}\n',
+        headers={"content-type": "application/x-json-stream"},
     )
     result = await call_tool(mcp, "redeploy_project", project_id="p1")
-    assert result == {"message": "redeployed"}
+    assert result["success"] is True
+    assert result["activityId"] == "a1"
+    assert result["logs"] == ["recreated"]
+    assert result["done"] is True
 
 
 # ── deploy_project ────────────────────────────────────────────────────

@@ -8,7 +8,7 @@ from typing import Any
 import httpx
 from fastmcp import FastMCP
 
-from ..client import _build_headers, require_client
+from ..client import _build_headers, parse_stream_response, require_client
 from ..safety import (
     ToolClass,
     compute_resource_hash,
@@ -115,15 +115,24 @@ def register(mcp: FastMCP) -> None:
 
             resp = await client.request(method, endpoint, headers=headers, **kwargs)
             resp.raise_for_status()
-            result = resp.json()
+            if encoding == "stream":
+                # Arcane action endpoints (e.g. /system/upgrade) answer with
+                # newline-delimited JSON; resp.json() raises "Extra data".
+                result = parse_stream_response(resp)
+            else:
+                result = resp.json()
 
+            # A stream can complete transport-wise and still report a failure
+            # inside its event payload; record that in the audit trail.
+            stream_failed = encoding == "stream" and not result.get("success")
             audit_log.log_result(
                 token=token,
                 action=entry["action"],
                 target=entry["target"],
                 env_id=entry.get("env_id", "0"),
-                success=True,
+                success=not stream_failed,
                 result=result,
+                error=(result.get("error") or "stream reported failure") if stream_failed else None,
             )
             return result
 

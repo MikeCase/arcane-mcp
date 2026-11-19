@@ -335,3 +335,76 @@ class TestConfirmEncoding:
         request = httpx_mock.get_requests()[0]
         assert request.headers["content-type"].startswith("application/json")
         assert json.loads(request.content) == {"name": "renamed"}
+
+    def test_stream_token_round_trips(self, store: TokenStore) -> None:
+        """A stream token stores its encoding and can be peeked and consumed."""
+        token = store.create(
+            action="trigger_upgrade",
+            target="system:0",
+            endpoint="/api/environments/0/system/upgrade",
+            method="POST",
+            encoding="stream",
+        )
+        info = store.peek(token)
+        assert info is not None
+        assert info["encoding"] == "stream"
+        assert store.consume(token)["encoding"] == "stream"
+
+    @pytest.mark.asyncio
+    async def test_stream_token_replays_and_parses(self, ops_mcp: Any, httpx_mock: Any, tmp_path) -> None:
+        """A stream token parses the action log and audits the parsed result as success."""
+        from tests.conftest import call_tool
+
+        httpx_mock.add_response(
+            url="http://localhost:3552/api/environments/0/system/upgrade",
+            method="POST",
+            content=b'{"activityId":"a1","type":"activity"}\n{"log":"upgrading"}\n{"done":true}\n',
+            headers={"content-type": "application/x-json-stream"},
+        )
+        token = get_token_store().create(
+            action="trigger_upgrade",
+            target="system:0",
+            endpoint="/api/environments/0/system/upgrade",
+            method="POST",
+            encoding="stream",
+        )
+        result = await call_tool(ops_mcp, "confirm_operation", token=token)
+
+        assert result["success"] is True
+        assert result["activityId"] == "a1"
+        assert result["logs"] == ["upgrading"]
+        assert result["done"] is True
+
+        entries = [json.loads(line) for line in (tmp_path / "audit.log").read_text().splitlines()]
+        results = [e for e in entries if e["event"] == "operation_result"]
+        assert results[-1]["success"] is True
+        assert results[-1]["result"]["activityId"] == "a1"
+        assert "error" not in results[-1]
+
+    @pytest.mark.asyncio
+    async def test_stream_failure_recorded_in_audit(self, ops_mcp: Any, httpx_mock: Any, tmp_path) -> None:
+        """An error event in the stream is reported and audited as a failure."""
+        from tests.conftest import call_tool
+
+        httpx_mock.add_response(
+            url="http://localhost:3552/api/environments/0/system/upgrade",
+            method="POST",
+            content=b'{"log":"pulling"}\n{"error":"upgrade failed"}\n{"done":true}\n',
+            headers={"content-type": "application/x-json-stream"},
+        )
+        token = get_token_store().create(
+            action="trigger_upgrade",
+            target="system:0",
+            endpoint="/api/environments/0/system/upgrade",
+            method="POST",
+            encoding="stream",
+        )
+        result = await call_tool(ops_mcp, "confirm_operation", token=token)
+
+        assert result["success"] is False
+        assert result["error"] == "upgrade failed"
+
+        entries = [json.loads(line) for line in (tmp_path / "audit.log").read_text().splitlines()]
+        results = [e for e in entries if e["event"] == "operation_result"]
+        assert results[-1]["success"] is False
+        assert results[-1]["error"] == "upgrade failed"

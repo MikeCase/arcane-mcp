@@ -8,7 +8,7 @@ from typing import Any
 import httpx
 from fastmcp import FastMCP
 
-from ..client import _build_headers, env_path, require_client
+from ..client import _build_headers, env_path, parse_stream_response, require_client
 from ..safety import ToolClass, compute_operation_hash, get_token_store
 
 logger = logging.getLogger(__name__)
@@ -205,7 +205,7 @@ def register(mcp: FastMCP) -> None:
         try:
             resp = await client.post(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
-            return resp.json()
+            return parse_stream_response(resp)
         except httpx.HTTPStatusError as e:
             logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
             return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}

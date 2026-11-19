@@ -30,14 +30,17 @@ async def test_list_images(mcp: Any, httpx_mock: Any) -> None:
 
 @pytest.mark.asyncio
 async def test_pull_image(mcp: Any, httpx_mock: Any) -> None:
-    """pull_image sends pull request."""
+    """pull_image parses the pull action stream."""
     httpx_mock.add_response(
         url="http://localhost:3552/api/environments/0/images/pull",
         method="POST",
-        json={"status": "pulling"},
+        content=b'{"activityId":"a2","type":"activity"}\n{"log":"Pulling nginx"}\n{"done":true}\n',
+        headers={"content-type": "application/x-json-stream"},
     )
     result = await call_tool(mcp, "pull_image", repository="nginx", tag="latest")
-    assert result == {"status": "pulling"}
+    assert result["success"] is True
+    assert result["activityId"] == "a2"
+    assert result["logs"] == ["Pulling nginx"]
 
 
 @pytest.mark.asyncio

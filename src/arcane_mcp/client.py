@@ -15,9 +15,11 @@ tests and for pinning a deployment.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import re
+from typing import Any
 
 import httpx
 from dotenv import load_dotenv
@@ -173,3 +175,69 @@ async def env_path(env_id: str, suffix: str) -> str:
     if not suffix.startswith("/"):
         suffix = "/" + suffix
     return prefix + suffix
+
+
+def parse_stream_response(resp: httpx.Response) -> dict[str, Any]:
+    """Parse an Arcane action stream into one plain result dict.
+
+    Why this exists: several Arcane action endpoints do **not** answer with a
+    single JSON document.  Project build/redeploy/pull, image pull/build,
+    volume backup creation and system upgrade stream newline-delimited JSON
+    with ``Content-Type: application/x-json-stream``::
+
+        {"activityId":"9e2733ae-...","type":"activity"}
+        {"log":"#1 [internal] load remote build context"}
+        {"log":"#1 CACHED"}
+        {"log":""}
+        {"done":true}
+
+    ``httpx.Response.json()`` (and thus every ``return resp.json()`` call
+    site) raises ``JSONDecodeError: Extra data: line 2 column 1`` on that
+    body even when the operation succeeded server-side.  This helper turns the
+    stream into a dict so the tools keep their normal success/error shape.
+
+    Semantics:
+
+    * blank lines are skipped;
+    * ``{"log": ...}`` records are collected into ``logs`` verbatim — an empty
+      log line is kept, it is part of the build output;
+    * the first ``activityId`` found becomes the result's ``activityId``;
+    * a ``{"done": true}`` record sets ``"done": True``;
+    * an event with a truthy ``error`` sets ``success`` to ``False`` and
+      surfaces that error under ``"error"``;
+    * a line that is not valid JSON (or is valid JSON but not an object) is
+      appended to ``logs`` verbatim instead of raising: one malformed line
+      must not lose the rest of the stream.
+
+    ``logs`` is never truncated here.  These are build logs and callers keep
+    the full list — the caller's model decides what is worth reading.
+    """
+    result: dict[str, Any] = {"success": True, "logs": []}
+    logs: list[Any] = result["logs"]
+
+    for raw_line in resp.text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        try:
+            record = json.loads(line)
+        except (ValueError, TypeError):
+            logs.append(raw_line)
+            continue
+
+        if not isinstance(record, dict):
+            logs.append(raw_line)
+            continue
+
+        if "activityId" in record and "activityId" not in result:
+            result["activityId"] = record["activityId"]
+        if record.get("done") is True:
+            result["done"] = True
+        if record.get("error"):
+            result["success"] = False
+            result["error"] = record["error"]
+        if "log" in record:
+            logs.append(record["log"])
+
+    return result

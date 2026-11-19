@@ -148,6 +148,9 @@ def register(mcp: FastMCP) -> None:
             classification=ToolClass.DESTRUCTIVE_WRITE,
             env_id=env_id,
             agent_token=agent_token,
+            # /system/upgrade streams an application/x-json-stream action log;
+            # confirm_operation must parse it with parse_stream_response().
+            encoding="stream",
         )
         return {
             "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",

@@ -124,16 +124,22 @@ class TokenStore:
             will re-fetch the resource and compare; a mismatch denies the
             confirmation.
         encoding:
-            How ``confirm_operation()`` must send ``body``: ``"json"`` (default)
-            sends it as an ``application/json`` request body, ``"multipart"``
-            sends it as ``multipart/form-data`` form fields.  For
-            ``"multipart"``, ``body`` must be a flat ``dict[str, str]`` whose
-            values are already serialized (e.g. JSON strings).
+            How ``confirm_operation()`` must send ``body`` and read the
+            response: ``"json"`` (default) sends it as an
+            ``application/json`` request body and parses the reply as JSON;
+            ``"multipart"`` sends it as ``multipart/form-data`` form fields;
+            ``"stream"`` behaves like ``"json"`` on the request side (no body
+            for the upgrade call) but parses the reply as a newline-delimited
+            ``application/x-json-stream`` action log via
+            ``parse_stream_response()``, because ``resp.json()`` raises
+            ``Extra data`` on those bodies.  For ``"multipart"``, ``body``
+            must be a flat ``dict[str, str]`` whose values are already
+            serialized (e.g. JSON strings).
 
         Returns the hex token string.
         """
-        if encoding not in ("json", "multipart"):
-            raise ValueError(f"encoding must be 'json' or 'multipart', got {encoding!r}")
+        if encoding not in ("json", "multipart", "stream"):
+            raise ValueError(f"encoding must be 'json', 'multipart' or 'stream', got {encoding!r}")
         operation_hash = compute_operation_hash(action, target, body, params)
         session_id = agent_token or "local"
         token = uuid.uuid4().hex[:12]
