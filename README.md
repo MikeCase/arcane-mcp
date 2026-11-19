@@ -148,6 +148,11 @@ uv sync
 uv run fastmcp run src/arcane_mcp/server.py
 ```
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md). 0.4.0 fixed the Compose project create/update/teardown
+payloads and added runtime support for Arcane v3's `/api/agents` routes.
+
 ## License
 
 MIT
