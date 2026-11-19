@@ -7,7 +7,7 @@ from typing import Any
 import httpx
 from fastmcp import FastMCP
 
-from ..client import _build_headers, require_client
+from ..client import _build_headers, env_path, require_client
 from ..safety import ToolClass, compute_operation_hash, get_token_store
 
 logger = logging.getLogger(__name__)
@@ -18,7 +18,7 @@ def register(mcp: FastMCP) -> None:
     async def list_images(env_id: str = "0", agent_token: str | None = None) -> Any:
         """List all images in the given environment."""
         client = require_client()
-        url = f"/api/environments/{env_id}/images"
+        url = await env_path(env_id, "/images")
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -34,7 +34,7 @@ def register(mcp: FastMCP) -> None:
     async def pull_image(repository: str, tag: str = "latest", env_id: str = "0", agent_token: str | None = None) -> Any:
         """Pull image from registry into environment."""
         client = require_client()
-        url = f"/api/environments/{env_id}/images/pull"
+        url = await env_path(env_id, "/images/pull")
         body = {"repository": repository, "tag": tag}
         try:
             resp = await client.post(url, json=body, headers=_build_headers(agent_token))
@@ -56,7 +56,7 @@ def register(mcp: FastMCP) -> None:
         token = get_token_store().create(
             action="remove_image",
             target=image_id,
-            endpoint=f"/api/environments/{env_id}/images/{image_id}",
+            endpoint=await env_path(env_id, f"/images/{image_id}"),
             method="DELETE",
             body={"force": str(force).lower()},
             params=None,
@@ -78,7 +78,7 @@ def register(mcp: FastMCP) -> None:
     async def inspect_image(image_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Inspect image by id."""
         client = require_client()
-        url = f"/api/environments/{env_id}/images/{image_id}"
+        url = await env_path(env_id, f"/images/{image_id}")
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -94,7 +94,7 @@ def register(mcp: FastMCP) -> None:
     async def tag_image(source: str, target: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Tag an existing image with a new repository name."""
         client = require_client()
-        url = f"/api/environments/{env_id}/images/{source}/tag"
+        url = await env_path(env_id, f"/images/{source}/tag")
         body = {"repo": target}
         try:
             resp = await client.post(url, json=body, headers=_build_headers(agent_token))
@@ -124,7 +124,7 @@ def register(mcp: FastMCP) -> None:
         token = get_token_store().create(
             action="prune_images",
             target="all",
-            endpoint=f"/api/environments/{env_id}/images/prune",
+            endpoint=await env_path(env_id, "/images/prune"),
             method="POST",
             body=None,
             params=None,
@@ -146,7 +146,7 @@ def register(mcp: FastMCP) -> None:
     async def get_image_counts(env_id: str = "0", agent_token: str | None = None) -> Any:
         """Get image count statistics for the environment."""
         client = require_client()
-        url = f"/api/environments/{env_id}/images/counts"
+        url = await env_path(env_id, "/images/counts")
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -162,7 +162,7 @@ def register(mcp: FastMCP) -> None:
     async def build_image(dockerfile_content: str, tag: str = "latest", env_id: str = "0", agent_token: str | None = None) -> Any:
         """Build an image from Dockerfile content."""
         client = require_client()
-        url = f"/api/environments/{env_id}/images/build"
+        url = await env_path(env_id, "/images/build")
         body = {"dockerfile": dockerfile_content, "tag": tag}
         try:
             resp = await client.post(url, json=body, headers=_build_headers(agent_token))
@@ -179,7 +179,7 @@ def register(mcp: FastMCP) -> None:
     async def search_images(query: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Search images by name/query in the environment."""
         client = require_client()
-        url = f"/api/environments/{env_id}/images/search"
+        url = await env_path(env_id, "/images/search")
         params = {"query": query}
         try:
             resp = await client.get(url, params=params, headers=_build_headers(agent_token))
@@ -201,7 +201,7 @@ def register(mcp: FastMCP) -> None:
         with a multipart/form-data request for actual file uploads.
         """
         client = require_client()
-        url = f"/api/environments/{env_id}/images/upload"
+        url = await env_path(env_id, "/images/upload")
         try:
             resp = await client.post(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -217,7 +217,7 @@ def register(mcp: FastMCP) -> None:
     async def get_image_history(image_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Get the build history for an image."""
         client = require_client()
-        url = f"/api/environments/{env_id}/images/{image_id}/history"
+        url = await env_path(env_id, f"/images/{image_id}/history")
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -233,7 +233,7 @@ def register(mcp: FastMCP) -> None:
     async def get_image_export(name: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Export an image by name (download its tar archive)."""
         client = require_client()
-        url = f"/api/environments/{env_id}/images/{name}/export"
+        url = await env_path(env_id, f"/images/{name}/export")
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -249,7 +249,7 @@ def register(mcp: FastMCP) -> None:
     async def get_image_attestations(name: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Get attestations for an image."""
         client = require_client()
-        url = f"/api/environments/{env_id}/images/{name}/attestations"
+        url = await env_path(env_id, f"/images/{name}/attestations")
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -265,7 +265,7 @@ def register(mcp: FastMCP) -> None:
     async def scan_image_vulnerabilities(image_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Trigger a vulnerability scan on an image."""
         client = require_client()
-        url = f"/api/environments/{env_id}/images/{image_id}/vulnerabilities/scan"
+        url = await env_path(env_id, f"/images/{image_id}/vulnerabilities/scan")
         try:
             resp = await client.post(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -281,7 +281,7 @@ def register(mcp: FastMCP) -> None:
     async def get_image_vulnerabilities(image_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Get vulnerability report for an image."""
         client = require_client()
-        url = f"/api/environments/{env_id}/images/{image_id}/vulnerabilities"
+        url = await env_path(env_id, f"/images/{image_id}/vulnerabilities")
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -297,7 +297,7 @@ def register(mcp: FastMCP) -> None:
     async def get_vulnerability_summary(image_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Get a summary of vulnerabilities for an image."""
         client = require_client()
-        url = f"/api/environments/{env_id}/images/{image_id}/vulnerabilities/summary"
+        url = await env_path(env_id, f"/images/{image_id}/vulnerabilities/summary")
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -313,7 +313,7 @@ def register(mcp: FastMCP) -> None:
     async def check_image_update(reference: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Check if a newer version of an image is available by reference."""
         client = require_client()
-        url = f"/api/environments/{env_id}/image-updates/check"
+        url = await env_path(env_id, "/image-updates/check")
         params = {"reference": reference}
         try:
             resp = await client.get(url, params=params, headers=_build_headers(agent_token))
@@ -330,7 +330,7 @@ def register(mcp: FastMCP) -> None:
     async def check_all_image_updates(env_id: str = "0", agent_token: str | None = None) -> Any:
         """Check for updates on all images in the environment."""
         client = require_client()
-        url = f"/api/environments/{env_id}/image-updates/check-all"
+        url = await env_path(env_id, "/image-updates/check-all")
         try:
             resp = await client.post(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -346,7 +346,7 @@ def register(mcp: FastMCP) -> None:
     async def get_image_update_summary(env_id: str = "0", agent_token: str | None = None) -> Any:
         """Get a summary of available image updates."""
         client = require_client()
-        url = f"/api/environments/{env_id}/image-updates/summary"
+        url = await env_path(env_id, "/image-updates/summary")
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()

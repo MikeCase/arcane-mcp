@@ -1,4 +1,5 @@
 """Shared test fixtures for arcane-mcp tests."""
+
 from __future__ import annotations
 
 import json
@@ -21,9 +22,16 @@ from arcane_mcp.tools import (
 
 @pytest.fixture(autouse=True)
 def setup_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Set default env vars for all tests."""
+    """Set default env vars for all tests.
+
+    ``ARCANE_API_VERSION`` is pinned so route construction never probes
+    ``GET /api/version``: tests must not touch the network, and an un-mocked
+    probe would also consume the first ``httpx_mock`` response. Tests that
+    exercise detection itself override it locally (see ``test_client.py``).
+    """
     monkeypatch.setenv("ARCANE_BASE_URL", "http://localhost:3552")
     monkeypatch.setenv("ARCANE_API_KEY", "test-key-abc123")
+    monkeypatch.setenv("ARCANE_API_VERSION", "2")
 
 
 @pytest.fixture
@@ -48,3 +56,33 @@ async def call_tool(mcp: FastMCP, tool_name: str, **kwargs: Any) -> Any:
     if result.content and hasattr(result.content[0], "text"):
         return json.loads(result.content[0].text)
     return result.content
+
+
+def register_operations(mcp: FastMCP) -> FastMCP:
+    """Register the safety/confirmation tools on an existing FastMCP instance."""
+    from arcane_mcp.tools import operations
+
+    operations.register(mcp)
+    return mcp
+
+
+def parse_multipart(request: Any) -> dict[str, str]:
+    """Parse a ``multipart/form-data`` request into ``{part_name: text}``.
+
+    Deliberately dependency-free: the tests only need plain text parts.
+    """
+    content_type = request.headers["content-type"]
+    assert content_type.startswith("multipart/form-data"), content_type
+    boundary = content_type.split("boundary=")[1].strip('"').encode()
+    parts: dict[str, str] = {}
+    for chunk in request.content.split(b"--" + boundary):
+        if b"\r\n\r\n" not in chunk:
+            continue
+        head, body = chunk.split(b"\r\n\r\n", 1)
+        if b'name="' not in head:
+            continue
+        name = head.split(b'name="', 1)[1].split(b'"', 1)[0].decode()
+        if body.endswith(b"\r\n"):
+            body = body[:-2]
+        parts[name] = body.decode()
+    return parts

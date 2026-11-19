@@ -1,4 +1,5 @@
 """Port mapping tools."""
+
 from __future__ import annotations
 
 import logging
@@ -7,7 +8,7 @@ from typing import Any
 import httpx
 from fastmcp import FastMCP
 
-from ..client import _build_headers, require_client
+from ..client import _build_headers, env_path, require_client
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ def register(mcp: FastMCP) -> None:
     async def list_ports(env_id: str = "0", agent_token: str | None = None) -> Any:
         """List all port mappings for the given environment."""
         client = require_client()
-        url = f"/api/environments/{env_id}/ports"
+        url = await env_path(env_id, "/ports")
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()

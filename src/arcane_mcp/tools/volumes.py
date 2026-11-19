@@ -1,4 +1,5 @@
 """Volume management tools."""
+
 from __future__ import annotations
 
 import logging
@@ -7,7 +8,7 @@ from typing import Any
 import httpx
 from fastmcp import FastMCP
 
-from ..client import _build_headers, require_client
+from ..client import _build_headers, env_path, require_client
 from ..safety import ToolClass, compute_operation_hash, get_token_store
 
 logger = logging.getLogger(__name__)
@@ -18,7 +19,7 @@ def register(mcp: FastMCP) -> None:
     async def list_volumes(env_id: str = "0", agent_token: str | None = None) -> Any:
         """List all volumes in the given environment."""
         client = require_client()
-        url = f"/api/environments/{env_id}/volumes"
+        url = await env_path(env_id, "/volumes")
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -32,12 +33,15 @@ def register(mcp: FastMCP) -> None:
 
     @mcp.tool()
     async def create_volume(
-        name: str, driver: str = "local", labels: str | None = None,
-        env_id: str = "0", agent_token: str | None = None,
+        name: str,
+        driver: str = "local",
+        labels: str | None = None,
+        env_id: str = "0",
+        agent_token: str | None = None,
     ) -> Any:
         """Create a new volume in the given environment."""
         client = require_client()
-        url = f"/api/environments/{env_id}/volumes"
+        url = await env_path(env_id, "/volumes")
         body: dict[str, Any] = {"name": name, "driver": driver}
         if labels:
             body["labels"] = labels
@@ -56,7 +60,7 @@ def register(mcp: FastMCP) -> None:
     async def inspect_volume(name: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Inspect a volume by name."""
         client = require_client()
-        url = f"/api/environments/{env_id}/volumes/{name}"
+        url = await env_path(env_id, f"/volumes/{name}")
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -70,21 +74,23 @@ def register(mcp: FastMCP) -> None:
 
     @mcp.tool()
     async def remove_volume(
-        name: str, force: bool = False, env_id: str = "0",
+        name: str,
+        force: bool = False,
+        env_id: str = "0",
         agent_token: str | None = None,
     ) -> Any:
         """Remove a volume by name. Destructive; requires confirmation token."""
         token = get_token_store().create(
             action="remove_volume",
             target=f"volume:{name}",
-            endpoint=f"/api/environments/{env_id}/volumes/{name}",
+            endpoint=await env_path(env_id, f"/volumes/{name}"),
             method="DELETE",
             body={"force": str(force).lower()},
             classification=ToolClass.DESTRUCTIVE_WRITE,
             env_id=env_id,
             agent_token=agent_token,
         )
-        op_hash = compute_operation_hash("remove_volume", name, {"force": str(force).lower()}, None)
+        op_hash = compute_operation_hash("remove_volume", f"volume:{name}", {"force": str(force).lower()}, None)
         return {
             "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
             "confirmation_token": token,
@@ -107,7 +113,7 @@ def register(mcp: FastMCP) -> None:
         token = get_token_store().create(
             action="prune_volumes",
             target="all",
-            endpoint=f"/api/environments/{env_id}/volumes/prune",
+            endpoint=await env_path(env_id, "/volumes/prune"),
             method="POST",
             classification=ToolClass.DESTRUCTIVE_WRITE,
             env_id=env_id,
@@ -129,7 +135,7 @@ def register(mcp: FastMCP) -> None:
     async def get_volume_counts(env_id: str = "0", agent_token: str | None = None) -> Any:
         """Get volume counts for the given environment."""
         client = require_client()
-        url = f"/api/environments/{env_id}/volumes/counts"
+        url = await env_path(env_id, "/volumes/counts")
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -145,7 +151,7 @@ def register(mcp: FastMCP) -> None:
     async def get_volume_sizes(env_id: str = "0", agent_token: str | None = None) -> Any:
         """Get volume sizes for the given environment."""
         client = require_client()
-        url = f"/api/environments/{env_id}/volumes/sizes"
+        url = await env_path(env_id, "/volumes/sizes")
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -161,7 +167,7 @@ def register(mcp: FastMCP) -> None:
     async def get_volume_usage(name: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Get disk usage for a specific volume."""
         client = require_client()
-        url = f"/api/environments/{env_id}/volumes/{name}/usage"
+        url = await env_path(env_id, f"/volumes/{name}/usage")
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -179,7 +185,7 @@ def register(mcp: FastMCP) -> None:
     async def list_volume_backups(name: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """List all backups for a volume."""
         client = require_client()
-        url = f"/api/environments/{env_id}/volumes/{name}/backups"
+        url = await env_path(env_id, f"/volumes/{name}/backups")
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -195,7 +201,7 @@ def register(mcp: FastMCP) -> None:
     async def create_volume_backup(name: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Create a new backup of a volume."""
         client = require_client()
-        url = f"/api/environments/{env_id}/volumes/{name}/backups"
+        url = await env_path(env_id, f"/volumes/{name}/backups")
         try:
             resp = await client.post(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -209,20 +215,22 @@ def register(mcp: FastMCP) -> None:
 
     @mcp.tool()
     async def restore_volume_backup(
-        volume_name: str, backup_id: str, env_id: str = "0",
+        volume_name: str,
+        backup_id: str,
+        env_id: str = "0",
         agent_token: str | None = None,
     ) -> Any:
         """Restore a volume backup. Destructive; requires confirmation token."""
         token = get_token_store().create(
             action="restore_volume_backup",
             target=f"volume:{volume_name}/backup:{backup_id}",
-            endpoint=f"/api/environments/{env_id}/volumes/{volume_name}/backups/{backup_id}/restore",
+            endpoint=await env_path(env_id, f"/volumes/{volume_name}/backups/{backup_id}/restore"),
             method="POST",
             classification=ToolClass.DESTRUCTIVE_WRITE,
             env_id=env_id,
             agent_token=agent_token,
         )
-        op_hash = compute_operation_hash("restore_volume_backup", volume_name, None, None)
+        op_hash = compute_operation_hash("restore_volume_backup", f"volume:{volume_name}/backup:{backup_id}", None, None)
         return {
             "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
             "confirmation_token": token,
@@ -234,20 +242,21 @@ def register(mcp: FastMCP) -> None:
 
     @mcp.tool()
     async def delete_volume_backup(
-        backup_id: str, env_id: str = "0",
+        backup_id: str,
+        env_id: str = "0",
         agent_token: str | None = None,
     ) -> Any:
         """Delete a volume backup. Destructive; requires confirmation token."""
         token = get_token_store().create(
             action="delete_volume_backup",
             target=f"backup:{backup_id}",
-            endpoint=f"/api/environments/{env_id}/volumes/backups/{backup_id}",
+            endpoint=await env_path(env_id, f"/volumes/backups/{backup_id}"),
             method="DELETE",
             classification=ToolClass.DESTRUCTIVE_WRITE,
             env_id=env_id,
             agent_token=agent_token,
         )
-        op_hash = compute_operation_hash("delete_volume_backup", backup_id, None, None)
+        op_hash = compute_operation_hash("delete_volume_backup", f"backup:{backup_id}", None, None)
         return {
             "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
             "confirmation_token": token,
@@ -261,7 +270,7 @@ def register(mcp: FastMCP) -> None:
     async def download_volume_backup(backup_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Download a volume backup."""
         client = require_client()
-        url = f"/api/environments/{env_id}/volumes/backups/{backup_id}/download"
+        url = await env_path(env_id, f"/volumes/backups/{backup_id}/download")
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -277,12 +286,14 @@ def register(mcp: FastMCP) -> None:
 
     @mcp.tool()
     async def browse_volume(
-        name: str, path: str = "/", env_id: str = "0",
+        name: str,
+        path: str = "/",
+        env_id: str = "0",
         agent_token: str | None = None,
     ) -> Any:
         """List files and directories at a path inside a volume."""
         client = require_client()
-        url = f"/api/environments/{env_id}/volumes/{name}/browse"
+        url = await env_path(env_id, f"/volumes/{name}/browse")
         params = {"path": path}
         try:
             resp = await client.get(url, params=params, headers=_build_headers(agent_token))
@@ -297,12 +308,14 @@ def register(mcp: FastMCP) -> None:
 
     @mcp.tool()
     async def read_volume_file(
-        name: str, path: str, env_id: str = "0",
+        name: str,
+        path: str,
+        env_id: str = "0",
         agent_token: str | None = None,
     ) -> Any:
         """Read the contents of a file inside a volume."""
         client = require_client()
-        url = f"/api/environments/{env_id}/volumes/{name}/browse/content"
+        url = await env_path(env_id, f"/volumes/{name}/browse/content")
         params = {"path": path}
         try:
             resp = await client.get(url, params=params, headers=_build_headers(agent_token))
@@ -322,12 +335,14 @@ def register(mcp: FastMCP) -> None:
 
     @mcp.tool()
     async def create_volume_directory(
-        name: str, path: str, env_id: str = "0",
+        name: str,
+        path: str,
+        env_id: str = "0",
         agent_token: str | None = None,
     ) -> Any:
         """Create a directory inside a volume."""
         client = require_client()
-        url = f"/api/environments/{env_id}/volumes/{name}/browse/mkdir"
+        url = await env_path(env_id, f"/volumes/{name}/browse/mkdir")
         body = {"path": path}
         try:
             resp = await client.post(url, json=body, headers=_build_headers(agent_token))
@@ -342,12 +357,15 @@ def register(mcp: FastMCP) -> None:
 
     @mcp.tool()
     async def upload_to_volume(
-        name: str, path: str, content: str, env_id: str = "0",
+        name: str,
+        path: str,
+        content: str,
+        env_id: str = "0",
         agent_token: str | None = None,
     ) -> Any:
         """Upload a file to a path inside a volume."""
         client = require_client()
-        url = f"/api/environments/{env_id}/volumes/{name}/browse/upload"
+        url = await env_path(env_id, f"/volumes/{name}/browse/upload")
         body = {"path": path, "content": content}
         try:
             resp = await client.post(url, json=body, headers=_build_headers(agent_token))
@@ -362,21 +380,23 @@ def register(mcp: FastMCP) -> None:
 
     @mcp.tool()
     async def delete_volume_file(
-        name: str, path: str, env_id: str = "0",
+        name: str,
+        path: str,
+        env_id: str = "0",
         agent_token: str | None = None,
     ) -> Any:
         """Delete a file or directory inside a volume. Destructive; requires confirmation token."""
         token = get_token_store().create(
             action="delete_volume_file",
             target=f"volume:{name}:{path}",
-            endpoint=f"/api/environments/{env_id}/volumes/{name}/browse",
+            endpoint=await env_path(env_id, f"/volumes/{name}/browse"),
             method="DELETE",
             params={"path": path},
             classification=ToolClass.DESTRUCTIVE_WRITE,
             env_id=env_id,
             agent_token=agent_token,
         )
-        op_hash = compute_operation_hash("delete_volume_file", f"{name}:{path}", None, {"path": path})
+        op_hash = compute_operation_hash("delete_volume_file", f"volume:{name}:{path}", None, {"path": path})
         return {
             "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
             "confirmation_token": token,

@@ -1,4 +1,11 @@
-"""Environment management tools."""
+"""Environment management tools.
+
+Arcane v3 calls these "agents": the collection moved from the v2 environments
+path to ``/api/agents`` (upstream PR #4731), and v3 serves no v2 alias.  Every
+route here is resolved at call time through ``client.api_collection`` /
+``client.env_path`` so the tool names and payloads stay the same on both majors.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -7,7 +14,7 @@ from typing import Any
 import httpx
 from fastmcp import FastMCP
 
-from ..client import require_client
+from ..client import api_collection, env_path, require_client
 from ..safety import ToolClass, compute_operation_hash, get_token_store
 
 logger = logging.getLogger(__name__)
@@ -18,7 +25,7 @@ def register(mcp: FastMCP) -> None:
     async def list_environments() -> Any:
         """List all environments (local + remote agents)."""
         client = require_client()
-        url = "/api/environments"
+        url = await api_collection()
         try:
             resp = await client.get(url)
             resp.raise_for_status()
@@ -34,7 +41,7 @@ def register(mcp: FastMCP) -> None:
     async def get_environment(env_id: str) -> Any:
         """Get details of a specific environment."""
         client = require_client()
-        url = f"/api/environments/{env_id}"
+        url = await env_path(env_id, "")
         try:
             resp = await client.get(url)
             resp.raise_for_status()
@@ -55,7 +62,7 @@ def register(mcp: FastMCP) -> None:
     async def create_environment(name: str, api_url: str, agent_token: str) -> Any:
         """Register a new remote agent environment."""
         client = require_client()
-        url = "/api/environments"
+        url = await api_collection()
         payload = {"name": name, "apiUrl": api_url, "accessToken": agent_token}
         try:
             resp = await client.post(url, json=payload)
@@ -72,7 +79,7 @@ def register(mcp: FastMCP) -> None:
     async def update_environment(env_id: str, name: str | None = None, api_url: str | None = None, agent_token: str | None = None) -> Any:
         """Update environment settings (name, API URL, or access token)."""
         client = require_client()
-        url = f"/api/environments/{env_id}"
+        url = await env_path(env_id, "")
         payload: dict[str, Any] = {}
         if name is not None:
             payload["name"] = name
@@ -97,7 +104,7 @@ def register(mcp: FastMCP) -> None:
         token = get_token_store().create(
             action="remove_environment",
             target=env_id,
-            endpoint=f"/api/environments/{env_id}",
+            endpoint=await env_path(env_id, ""),
             method="DELETE",
             body=None,
             params=None,
@@ -105,4 +112,11 @@ def register(mcp: FastMCP) -> None:
             env_id=env_id,
             agent_token=None,
         )
-        return {"warning": "Destructive operation. Call confirm_operation(token=...) to proceed.", "confirmation_token": token, "classification": ToolClass.DESTRUCTIVE_WRITE, "operation_hash": compute_operation_hash("remove_environment", env_id, None, None), "target": env_id, "action": "remove_environment"}
+        return {
+            "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
+            "confirmation_token": token,
+            "classification": ToolClass.DESTRUCTIVE_WRITE,
+            "operation_hash": compute_operation_hash("remove_environment", env_id, None, None),
+            "target": env_id,
+            "action": "remove_environment",
+        }

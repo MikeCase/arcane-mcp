@@ -1,4 +1,5 @@
 """Activity and event tools."""
+
 from __future__ import annotations
 
 import logging
@@ -7,7 +8,7 @@ from typing import Any
 import httpx
 from fastmcp import FastMCP
 
-from ..client import _build_headers, require_client
+from ..client import _build_headers, env_path, require_client
 from ..safety import ToolClass, compute_operation_hash, get_token_store
 
 logger = logging.getLogger(__name__)
@@ -18,7 +19,7 @@ def register(mcp: FastMCP) -> None:
     async def list_activities(env_id: str = "0", agent_token: str | None = None) -> Any:
         """List current and recent background activities for an environment."""
         client = require_client()
-        url = f"/api/environments/{env_id}/activities"
+        url = await env_path(env_id, "/activities")
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -34,7 +35,7 @@ def register(mcp: FastMCP) -> None:
     async def get_activity(activity_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Get a specific background activity."""
         client = require_client()
-        url = f"/api/environments/{env_id}/activities/{activity_id}"
+        url = await env_path(env_id, f"/activities/{activity_id}")
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -50,7 +51,7 @@ def register(mcp: FastMCP) -> None:
     async def cancel_activity(activity_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Cancel a running background activity."""
         client = require_client()
-        url = f"/api/environments/{env_id}/activities/{activity_id}/cancel"
+        url = await env_path(env_id, f"/activities/{activity_id}/cancel")
         try:
             resp = await client.post(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -66,11 +67,15 @@ def register(mcp: FastMCP) -> None:
     async def clear_activity_history(env_id: str = "0", agent_token: str | None = None, dry_run: bool = True) -> Any:
         """Clear activity history for an environment. Requires confirmation via confirmation_token."""
         if dry_run:
-            return {"warning": "Dry-run: would clear activity history. Set dry_run=False and call confirm_operation(token=...) to proceed.", "target": env_id, "action": "clear_activity_history"}
+            return {
+                "warning": "Dry-run: would clear activity history. Set dry_run=False and call confirm_operation(token=...) to proceed.",
+                "target": env_id,
+                "action": "clear_activity_history",
+            }
         token = get_token_store().create(
             action="clear_activity_history",
             target=env_id,
-            endpoint=f"/api/environments/{env_id}/activities/history",
+            endpoint=await env_path(env_id, "/activities/history"),
             method="DELETE",
             body=None,
             params=None,
@@ -78,7 +83,14 @@ def register(mcp: FastMCP) -> None:
             env_id=env_id,
             agent_token=agent_token,
         )
-        return {"warning": "Destructive operation. Call confirm_operation(token=...) to proceed.", "confirmation_token": token, "classification": ToolClass.DESTRUCTIVE_WRITE, "operation_hash": compute_operation_hash("clear_activity_history", env_id, None, None), "target": env_id, "action": "clear_activity_history"}
+        return {
+            "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
+            "confirmation_token": token,
+            "classification": ToolClass.DESTRUCTIVE_WRITE,
+            "operation_hash": compute_operation_hash("clear_activity_history", env_id, None, None),
+            "target": env_id,
+            "action": "clear_activity_history",
+        }
 
     @mcp.tool()
     async def list_events(agent_token: str | None = None) -> Any:
@@ -126,4 +138,11 @@ def register(mcp: FastMCP) -> None:
             env_id=None,
             agent_token=agent_token,
         )
-        return {"warning": "Destructive operation. Call confirm_operation(token=...) to proceed.", "confirmation_token": token, "classification": ToolClass.DESTRUCTIVE_WRITE, "operation_hash": compute_operation_hash("delete_event", event_id, None, None), "target": event_id, "action": "delete_event"}
+        return {
+            "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
+            "confirmation_token": token,
+            "classification": ToolClass.DESTRUCTIVE_WRITE,
+            "operation_hash": compute_operation_hash("delete_event", event_id, None, None),
+            "target": event_id,
+            "action": "delete_event",
+        }

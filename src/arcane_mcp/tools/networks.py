@@ -1,4 +1,5 @@
 """Network management tools."""
+
 from __future__ import annotations
 
 import logging
@@ -7,7 +8,7 @@ from typing import Any
 import httpx
 from fastmcp import FastMCP
 
-from ..client import _build_headers, require_client
+from ..client import _build_headers, env_path, require_client
 from ..safety import ToolClass, compute_operation_hash, get_token_store
 
 logger = logging.getLogger(__name__)
@@ -18,7 +19,7 @@ def register(mcp: FastMCP) -> None:
     async def list_networks(env_id: str = "0", agent_token: str | None = None) -> Any:
         """List all networks in the given environment."""
         client = require_client()
-        url = f"/api/environments/{env_id}/networks"
+        url = await env_path(env_id, "/networks")
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -34,7 +35,7 @@ def register(mcp: FastMCP) -> None:
     async def create_network(name: str, driver: str = "bridge", env_id: str = "0", agent_token: str | None = None) -> Any:
         """Create a new network in the given environment."""
         client = require_client()
-        url = f"/api/environments/{env_id}/networks"
+        url = await env_path(env_id, "/networks")
         payload = {"name": name, "driver": driver}
         try:
             resp = await client.post(url, json=payload, headers=_build_headers(agent_token))
@@ -51,7 +52,7 @@ def register(mcp: FastMCP) -> None:
     async def inspect_network(network_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Inspect a specific network."""
         client = require_client()
-        url = f"/api/environments/{env_id}/networks/{network_id}"
+        url = await env_path(env_id, f"/networks/{network_id}")
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -69,13 +70,13 @@ def register(mcp: FastMCP) -> None:
         token = get_token_store().create(
             action="remove_network",
             target=f"network:{network_id}",
-            endpoint=f"/api/environments/{env_id}/networks/{network_id}",
+            endpoint=await env_path(env_id, f"/networks/{network_id}"),
             method="DELETE",
             classification=ToolClass.DESTRUCTIVE_WRITE,
             env_id=env_id,
             agent_token=agent_token,
         )
-        op_hash = compute_operation_hash("remove_network", network_id, None, None)
+        op_hash = compute_operation_hash("remove_network", f"network:{network_id}", None, None)
         return {
             "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
             "confirmation_token": token,
@@ -89,7 +90,7 @@ def register(mcp: FastMCP) -> None:
     async def connect_container_to_network(network_id: str, container_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Connect a container to a network."""
         client = require_client()
-        url = f"/api/environments/{env_id}/networks/{network_id}/connect"
+        url = await env_path(env_id, f"/networks/{network_id}/connect")
         payload = {"container": container_id}
         try:
             resp = await client.post(url, json=payload, headers=_build_headers(agent_token))
@@ -104,12 +105,14 @@ def register(mcp: FastMCP) -> None:
 
     @mcp.tool()
     async def disconnect_container_from_network(
-        network_id: str, container_id: str, env_id: str = "0",
+        network_id: str,
+        container_id: str,
+        env_id: str = "0",
         agent_token: str | None = None,
     ) -> Any:
         """Disconnect a container from a network."""
         client = require_client()
-        url = f"/api/environments/{env_id}/networks/{network_id}/disconnect"
+        url = await env_path(env_id, f"/networks/{network_id}/disconnect")
         payload = {"container": container_id}
         try:
             resp = await client.post(url, json=payload, headers=_build_headers(agent_token))
@@ -135,7 +138,7 @@ def register(mcp: FastMCP) -> None:
         token = get_token_store().create(
             action="prune_networks",
             target="all",
-            endpoint=f"/api/environments/{env_id}/networks/prune",
+            endpoint=await env_path(env_id, "/networks/prune"),
             method="POST",
             classification=ToolClass.DESTRUCTIVE_WRITE,
             env_id=env_id,
@@ -155,7 +158,7 @@ def register(mcp: FastMCP) -> None:
     async def get_network_counts(env_id: str = "0", agent_token: str | None = None) -> Any:
         """Get network counts for the given environment."""
         client = require_client()
-        url = f"/api/environments/{env_id}/networks/counts"
+        url = await env_path(env_id, "/networks/counts")
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -171,7 +174,7 @@ def register(mcp: FastMCP) -> None:
     async def get_network_topology(env_id: str = "0", agent_token: str | None = None) -> Any:
         """Get network topology for the given environment."""
         client = require_client()
-        url = f"/api/environments/{env_id}/networks/topology"
+        url = await env_path(env_id, "/networks/topology")
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()

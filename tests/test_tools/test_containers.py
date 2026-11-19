@@ -1,11 +1,20 @@
 """Tests for container tools."""
+
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import pytest
 
-from tests.conftest import call_tool
+from tests.conftest import call_tool, register_operations
+
+
+@pytest.fixture
+def ops_mcp(mcp: Any) -> Any:
+    """MCP instance with the safety tools registered (for confirm_operation)."""
+    return register_operations(mcp)
+
 
 # ── list_containers ───────────────────────────────────────────────────
 
@@ -48,14 +57,16 @@ async def test_list_containers_http_error(mcp: Any, httpx_mock: Any) -> None:
 
 @pytest.mark.asyncio
 async def test_inspect_container(mcp: Any, httpx_mock: Any) -> None:
-    """inspect_container returns container details."""
+    """inspect_container wraps the details in a credential-sensitive envelope."""
     httpx_mock.add_response(
         url="http://localhost:3552/api/environments/0/containers/c1",
         method="GET",
         json={"id": "c1", "name": "web", "config": {}},
     )
     result = await call_tool(mcp, "inspect_container", container_id="c1")
-    assert result["id"] == "c1"
+    assert result["classification"] == "credential_sensitive"
+    assert "warning" in result
+    assert result["data"]["id"] == "c1"
 
 
 # ── start / stop / restart ────────────────────────────────────────────
@@ -83,6 +94,7 @@ async def test_stop_container(mcp: Any, httpx_mock: Any) -> None:
     )
     result = await call_tool(mcp, "stop_container", container_id="c1", timeout=30)
     assert result == {"message": "stopped"}
+    assert json.loads(httpx_mock.get_requests()[0].content) == {"timeout": 30}
 
 
 @pytest.mark.asyncio
@@ -95,6 +107,7 @@ async def test_restart_container(mcp: Any, httpx_mock: Any) -> None:
     )
     result = await call_tool(mcp, "restart_container", container_id="c1")
     assert result == {"message": "restarted"}
+    assert json.loads(httpx_mock.get_requests()[0].content) == {"timeout": 10}
 
 
 # ── remove_container ──────────────────────────────────────────────────
@@ -102,22 +115,41 @@ async def test_restart_container(mcp: Any, httpx_mock: Any) -> None:
 
 @pytest.mark.asyncio
 async def test_remove_container_needs_confirm(mcp: Any, httpx_mock: Any) -> None:
-    """remove_container returns warning when confirm=False."""
+    """remove_container returns a proposal and touches no endpoint."""
     result = await call_tool(mcp, "remove_container", container_id="c1")
+    assert result["action"] == "remove_container"
+    assert result["target"] == "c1"
+    assert result["classification"] == "destructive_write"
+    assert result["confirmation_token"]
+    assert result["operation_hash"]
     assert "warning" in result
-    assert result["container_id"] == "c1"
+    assert httpx_mock.get_requests() == []
 
 
 @pytest.mark.asyncio
-async def test_remove_container_confirmed(mcp: Any, httpx_mock: Any) -> None:
-    """remove_container executes when confirm=True."""
+async def test_remove_container_confirmed(ops_mcp: Any, httpx_mock: Any) -> None:
+    """remove_container executes the DELETE after confirm_operation."""
     httpx_mock.add_response(
         url="http://localhost:3552/api/environments/0/containers/c1?force=false",
         method="DELETE",
         json={"message": "removed"},
     )
-    result = await call_tool(mcp, "remove_container", container_id="c1", confirm=True)
+    proposal = await call_tool(ops_mcp, "remove_container", container_id="c1")
+    assert httpx_mock.get_requests() == []
+
+    result = await call_tool(
+        ops_mcp,
+        "confirm_operation",
+        token=proposal["confirmation_token"],
+        operation_hash=proposal["operation_hash"],
+    )
     assert result == {"message": "removed"}
+
+    request = httpx_mock.get_requests()[0]
+    assert request.method == "DELETE"
+    assert request.url.path == "/api/environments/0/containers/c1"
+    assert request.url.params["force"] == "false"
+    assert request.content == b""
 
 
 # ── create_container ──────────────────────────────────────────────────

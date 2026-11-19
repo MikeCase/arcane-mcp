@@ -11,7 +11,6 @@ from fastmcp import FastMCP
 from ..client import _build_headers, require_client
 from ..safety import (
     ToolClass,
-    compute_operation_hash,
     compute_resource_hash,
     get_audit_log,
     get_token_store,
@@ -77,7 +76,8 @@ def register(mcp: FastMCP) -> None:
                     if fresh_hash is not None and fresh_hash != stored_resource_hash:
                         logger.warning(
                             "Token %s: resource %s changed since proposal",
-                            token, entry["target"],
+                            token,
+                            entry["target"],
                         )
                         return {
                             "error": "Resource state has changed since the "
@@ -99,8 +99,17 @@ def register(mcp: FastMCP) -> None:
 
         try:
             kwargs: dict[str, Any] = {}
-            if entry.get("body") is not None:
-                kwargs["json"] = entry["body"]
+            body = entry.get("body")
+            encoding = entry.get("encoding", "json")
+            if body is not None:
+                if encoding == "multipart":
+                    # Plain text form fields: (None, value) tuples have no
+                    # filename, so httpx encodes them as multipart/form-data
+                    # text parts.  Do not set Content-Type — httpx must
+                    # generate the boundary.
+                    kwargs["files"] = {k: (None, str(v)) for k, v in body.items()}
+                else:
+                    kwargs["json"] = body
             if entry.get("params") is not None:
                 kwargs["params"] = entry["params"]
 
@@ -189,6 +198,7 @@ def register(mcp: FastMCP) -> None:
     ) -> Any:
         """Return the classification label for a given tool classification value."""
         from ..safety import CLASSIFICATION_LABELS
+
         return {
             "classification": classification,
             "label": CLASSIFICATION_LABELS.get(ToolClass(classification), "Unknown"),
