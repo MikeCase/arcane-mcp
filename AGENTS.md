@@ -30,7 +30,32 @@ uv build                                            # Build wheel
 uv publish                                          # Push to PyPI
 ```
 
-**Note:** No lint/typecheck config exists yet. No test suite either — run `uv run` directly for ad-hoc verification.
+**Note:** ruff and mypy are configured in `pyproject.toml`; the suite runs with `uv run pytest`.
+`ARCANE_API_VERSION=2` is pinned by `tests/conftest.py` so route tests stay off the network.
+
+---
+
+## Releasing — two repos must agree
+
+The code lives in **GitHub** (`MikeCase/arcane-mcp`); the landing page lives in **Forgejo**
+(`fj.splaq.us/splaq/arcane-mcp-site`) and is served at <https://arcanemcp.splaq.us>. Nothing links
+them, so a release means touching both or the page quietly lies about the version.
+
+1. **Code repo** — bump `pyproject.toml` `version`, add a `CHANGELOG.md` entry, commit, push to
+   `origin` (GitHub).
+2. **Count the tools** (only when tools were added or removed):
+   ```bash
+   grep -rh '@mcp.tool()' src/arcane_mcp/tools/*.py | wc -l
+   ```
+3. **Site repo** — clone `git@fj.splaq.us:splaq/arcane-mcp-site.git`, then update three places in
+   `index.html`: the hero badge, the stats block (`stat-number`), and the architecture caption
+   (`<div class="desc">`). Commit and push to `main`.
+4. **Verify** — Arcane's GitOps sync publishes within ~5 minutes:
+   ```bash
+   curl -s https://arcanemcp.splaq.us | grep -o 'v[0-9.]* &middot; [0-9]* tools'
+   ```
+
+Skipping step 3 is how the badge sat at `v0.3.0 · 125 tools` while the server was `0.4.0` with 127.
 
 ---
 
