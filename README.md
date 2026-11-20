@@ -31,35 +31,128 @@ uv sync
 
 ## Configuration
 
-Set these environment variables (or put them in a `.env` file in the working directory):
+Two environment variables, and that is the whole config:
 
-```env
-ARCANE_API_KEY=arc_your_api_key_here
-ARCANE_BASE_URL=http://localhost:3552
-```
+| Variable | Purpose |
+|---|---|
+| `ARCANE_BASE_URL` | Your Arcane instance, e.g. `https://arcane.example.com:3552` |
+| `ARCANE_API_KEY` | API key from Arcane → Settings → API Keys |
 
-### OpenCode
+Pass them in your MCP client's config (below). A `.env` is read only when the server is launched
+from the directory containing it, so the client config is the reliable path.
 
-Add to your `opencode.json`:
+### OpenCode v2
 
-```json
+`~/.config/opencode/opencode.jsonc`:
+
+```jsonc
 {
+  "$schema": "https://opencode.ai/config.json",
   "mcp": {
-    "arcane-docker": {
-      "type": "local",
-      "command": ["arcane-mcp"],
-      "env": {
-        "ARCANE_API_KEY": "arc_your_key_here",
-        "ARCANE_BASE_URL": "http://localhost:3552"
+    "servers": {
+      "arcane-mcp": {
+        "type": "local",
+        "command": ["arcane-mcp"],
+        "environment": {
+          "ARCANE_BASE_URL": "https://arcane.example.com:3552",
+          "ARCANE_API_KEY": "{env:ARCANE_API_KEY}"
+        }
       }
     }
   }
 }
 ```
 
-Or set environment variables globally and omit them from the config.
+Servers nest under `mcp.servers` in v2 — a v1 config with the name directly under `mcp` still loads
+but is not the current shape. `{env:VAR}` is OpenCode's own syntax; a shell `$VAR` is not expanded.
+v2 enables `codemode` by default, so tools surface as `tools.arcane_mcp.list_containers`.
+
+### Claude Code
+
+```bash
+claude mcp add arcane-mcp \
+  --env ARCANE_BASE_URL=https://arcane.example.com:3552 \
+  --env ARCANE_API_KEY=your-key \
+  --transport stdio \
+  -- arcane-mcp
+```
+
+`--transport stdio` must come between the last `--env` and the server name: with a name directly
+after `--env`, the CLI reads it as another `KEY=value` pair. Add `--scope project` to write a
+committable `.mcp.json` instead of the default local scope.
+
+### Claude Desktop
+
+`~/Library/Application Support/Claude/claude_desktop_config.json` (macOS),
+`%APPDATA%\Claude\claude_desktop_config.json` (Windows),
+`~/.config/Claude/claude_desktop_config.json` (Linux):
+
+```json
+{
+  "mcpServers": {
+    "arcane-mcp": {
+      "command": "arcane-mcp",
+      "args": [],
+      "env": {
+        "ARCANE_BASE_URL": "https://arcane.example.com:3552",
+        "ARCANE_API_KEY": "your-key"
+      }
+    }
+  }
+}
+```
+
+Desktop does not document variable interpolation — put the key in literally, then restart the app
+fully.
+
+### Cursor
+
+`.cursor/mcp.json` (project) or `~/.cursor/mcp.json` (global):
+
+```json
+{
+  "mcpServers": {
+    "arcane-mcp": {
+      "type": "stdio",
+      "command": "arcane-mcp",
+      "args": [],
+      "env": {
+        "ARCANE_BASE_URL": "https://arcane.example.com:3552",
+        "ARCANE_API_KEY": "${env:ARCANE_API_KEY}"
+      }
+    }
+  }
+}
+```
+
+### VS Code
+
+Portable form at the workspace root, `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "arcane-mcp": {
+      "type": "stdio",
+      "command": "arcane-mcp",
+      "args": [],
+      "env": {
+        "ARCANE_BASE_URL": "https://arcane.example.com:3552",
+        "ARCANE_API_KEY": "${ARCANE_API_KEY}"
+      }
+    }
+  }
+}
+```
+
+The older editor-managed `.vscode/mcp.json` with a `"servers"` key still works but is deprecated, and
+it uses a different substitution syntax (`${env:NAME}`).
 
 ## Tools (127 total)
+
+Seven tools have no Arcane v3 endpoint and return an explicit notice instead of calling the API:
+`exec_in_container`, `get_container_logs`, `get_container_stats`, `create_volume_directory`,
+`upload_to_volume`, `delete_volume_file`, `trigger_webhook`.
 
 ### Containers (18)
 list_containers, inspect_container, create_container, start_container, stop_container, restart_container, kill_container, pause_container, unpause_container, remove_container, redeploy_container, commit_container, update_container, set_container_auto_update, exec_in_container, get_container_logs, get_container_stats, get_container_counts
