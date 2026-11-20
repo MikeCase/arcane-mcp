@@ -49,22 +49,21 @@ from the directory containing it, so the client config is the reliable path.
 {
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
-    "servers": {
-      "arcane-mcp": {
-        "type": "local",
-        "command": ["arcane-mcp"],
-        "environment": {
-          "ARCANE_BASE_URL": "https://arcane.example.com:3552",
-          "ARCANE_API_KEY": "{env:ARCANE_API_KEY}"
-        }
+    "arcane-mcp": {
+      "type": "local",
+      "command": ["arcane-mcp"],
+      "environment": {
+        "ARCANE_BASE_URL": "https://arcane.example.com:3552",
+        "ARCANE_API_KEY": "{env:ARCANE_API_KEY}"
       }
     }
   }
 }
 ```
 
-Servers nest under `mcp.servers` in v2 — a v1 config with the name directly under `mcp` still loads
-but is not the current shape. `{env:VAR}` is OpenCode's own syntax; a shell `$VAR` is not expanded.
+Declare the server flat under `mcp`. OpenCode's docs show a `mcp.servers` nesting, but the shipping
+v2.0.26 build does not read servers declared there — verified with `opencode mcp list`, which reports
+none configured. `{env:VAR}` is OpenCode's own syntax; a shell `$VAR` is not expanded.
 v2 enables `codemode` by default, so tools surface as `tools.arcane_mcp.list_containers`.
 
 ### Claude Code
