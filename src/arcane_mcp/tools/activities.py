@@ -8,7 +8,7 @@ from typing import Any
 import httpx
 from fastmcp import FastMCP
 
-from ..client import _build_headers, env_path, require_client
+from ..client import _build_headers, env_path, paginate_all, require_client
 from ..safety import ToolClass, compute_operation_hash, get_token_store
 
 logger = logging.getLogger(__name__)
@@ -18,15 +18,17 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     async def list_activities(env_id: str = "0", agent_token: str | None = None) -> Any:
         """List current and recent background activities for an environment."""
-        client = require_client()
         url = await env_path(env_id, "/activities")
         try:
-            resp = await client.get(url, headers=_build_headers(agent_token))
-            resp.raise_for_status()
-            return resp.json()
+            # v3 pages collections at 20 by default.
+            return await paginate_all(url, agent_token=agent_token)
         except httpx.HTTPStatusError as e:
-            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
-            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+            logger.warning("HTTP %s on %s: %s", e.response.status_code, url, e.response.text)
+            return {
+                "error": str(e),
+                "status_code": e.response.status_code,
+                "detail": e.response.text,
+            }
         except Exception as e:
             logger.exception("Unexpected error on %s", url)
             return {"error": str(e)}
@@ -51,9 +53,10 @@ def register(mcp: FastMCP) -> None:
     async def cancel_activity(activity_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Cancel a running background activity."""
         client = require_client()
-        url = await env_path(env_id, f"/activities/{activity_id}/cancel")
+        url = await env_path(env_id, f"/activities/{activity_id}")
+        params = {"action": "cancel"}
         try:
-            resp = await client.post(url, headers=_build_headers(agent_token))
+            resp = await client.post(url, params=params, headers=_build_headers(agent_token))
             resp.raise_for_status()
             return resp.json()
         except httpx.HTTPStatusError as e:
@@ -95,15 +98,16 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     async def list_events(agent_token: str | None = None) -> Any:
         """List system events (paginated, across all environments)."""
-        client = require_client()
         url = "/api/events"
         try:
-            resp = await client.get(url, headers=_build_headers(agent_token))
-            resp.raise_for_status()
-            return resp.json()
+            return await paginate_all(url, agent_token=agent_token)
         except httpx.HTTPStatusError as e:
-            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
-            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+            logger.warning("HTTP %s on %s: %s", e.response.status_code, url, e.response.text)
+            return {
+                "error": str(e),
+                "status_code": e.response.status_code,
+                "detail": e.response.text,
+            }
         except Exception as e:
             logger.exception("Unexpected error on %s", url)
             return {"error": str(e)}
@@ -111,15 +115,18 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     async def get_environment_events(environment_id: str, agent_token: str | None = None) -> Any:
         """Get events for a specific environment."""
-        client = require_client()
-        url = f"/api/events/environment/{environment_id}"
+        # v3 renamed the per-environment event route: /api/events/environment/{id}
+        # became /api/events/agent/{environmentId}.
+        url = f"/api/events/agent/{environment_id}"
         try:
-            resp = await client.get(url, headers=_build_headers(agent_token))
-            resp.raise_for_status()
-            return resp.json()
+            return await paginate_all(url, agent_token=agent_token)
         except httpx.HTTPStatusError as e:
-            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
-            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+            logger.warning("HTTP %s on %s: %s", e.response.status_code, url, e.response.text)
+            return {
+                "error": str(e),
+                "status_code": e.response.status_code,
+                "detail": e.response.text,
+            }
         except Exception as e:
             logger.exception("Unexpected error on %s", url)
             return {"error": str(e)}

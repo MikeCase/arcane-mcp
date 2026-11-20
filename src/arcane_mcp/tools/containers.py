@@ -1,4 +1,5 @@
 """Container lifecycle tools."""
+
 from __future__ import annotations
 
 import logging
@@ -7,7 +8,7 @@ from typing import Any
 import httpx
 from fastmcp import FastMCP
 
-from ..client import _build_headers, env_path, require_client
+from ..client import _build_headers, env_path, paginate_all, require_client
 from ..safety import ToolClass, compute_operation_hash, get_token_store
 
 logger = logging.getLogger(__name__)
@@ -19,15 +20,12 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     async def list_containers(all: bool = False, env_id: str = "0", agent_token: str | None = None) -> Any:
         """List containers for a given Arcane environment."""
-        client = require_client()
         url = await env_path(env_id, "/containers")
         try:
-            resp = await client.get(url, params={"all": str(all).lower()}, headers=_build_headers(agent_token))
-            resp.raise_for_status()
-            return resp.json()
+            return await paginate_all(url, params={"all": str(all).lower()})
         except httpx.HTTPStatusError as e:
-            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
-            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+            logger.warning("HTTP %s on %s: %s", e.response.status_code, url, e.response.text)
+            return {"error": str(e), "status_code": e.response.status_code, "detail": e.response.text}
         except Exception as e:
             logger.exception("Unexpected error on %s", url)
             return {"error": str(e)}
@@ -57,9 +55,9 @@ def register(mcp: FastMCP) -> None:
     async def start_container(container_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Start a stopped container."""
         client = require_client()
-        url = await env_path(env_id, f"/containers/{container_id}/start")
+        url = await env_path(env_id, f"/containers/{container_id}")
         try:
-            resp = await client.post(url, headers=_build_headers(agent_token))
+            resp = await client.post(url, params={"action": "start"}, headers=_build_headers(agent_token))
             resp.raise_for_status()
             return resp.json()
         except httpx.HTTPStatusError as e:
@@ -73,9 +71,9 @@ def register(mcp: FastMCP) -> None:
     async def stop_container(container_id: str, timeout: int = 10, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Stop a running container gracefully."""
         client = require_client()
-        url = await env_path(env_id, f"/containers/{container_id}/stop")
+        url = await env_path(env_id, f"/containers/{container_id}")
         try:
-            resp = await client.post(url, headers=_build_headers(agent_token), json={"timeout": timeout})
+            resp = await client.post(url, params={"action": "stop"}, headers=_build_headers(agent_token))
             resp.raise_for_status()
             return resp.json()
         except httpx.HTTPStatusError as e:
@@ -89,9 +87,9 @@ def register(mcp: FastMCP) -> None:
     async def restart_container(container_id: str, timeout: int = 10, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Restart a running container."""
         client = require_client()
-        url = await env_path(env_id, f"/containers/{container_id}/restart")
+        url = await env_path(env_id, f"/containers/{container_id}")
         try:
-            resp = await client.post(url, headers=_build_headers(agent_token), json={"timeout": timeout})
+            resp = await client.post(url, params={"action": "restart"}, headers=_build_headers(agent_token))
             resp.raise_for_status()
             return resp.json()
         except httpx.HTTPStatusError as e:
@@ -103,7 +101,9 @@ def register(mcp: FastMCP) -> None:
 
     @mcp.tool()
     async def remove_container(
-        container_id: str, force: bool = False, env_id: str = "0",
+        container_id: str,
+        force: bool = False,
+        env_id: str = "0",
         agent_token: str | None = None,
     ) -> Any:
         """Remove a container. Requires confirmation token to execute."""
@@ -130,11 +130,19 @@ def register(mcp: FastMCP) -> None:
 
     @mcp.tool()
     async def create_container(
-        image: str, name: str, env_id: str = "0",
-        agent_token: str | None = None, command: str | None = None,
-        env: str | None = None, labels: str | None = None,
+        image: str,
+        name: str,
+        env_id: str = "0",
+        agent_token: str | None = None,
+        command: str | None = None,
+        env: str | None = None,
+        labels: str | None = None,
     ) -> Any:
-        """Create and optionally start a container. Command is a string that will be split into an array (e.g. 'sleep 60' becomes ['sleep', '60']). For the raw array form use the JSON format for env/labels."""
+        """Create and optionally start a container.
+
+        `command` is a string that is split into an array (``'sleep 60'`` becomes
+        ``['sleep', '60']``). For the raw array form use the JSON format for env/labels.
+        """
         client = require_client()
         url = await env_path(env_id, "/containers")
         payload: dict[str, Any] = {"image": image, "name": name}
@@ -157,75 +165,63 @@ def register(mcp: FastMCP) -> None:
 
     @mcp.tool()
     async def exec_in_container(container_id: str, command: str, env_id: str = "0", agent_token: str | None = None) -> Any:
-        """Execute a command inside a running container. NOTE: The Arcane API does not expose a container exec endpoint. This tool will attempt to use SSH as a fallback if available, otherwise returns an error."""
-        client = require_client()
-        url = await env_path(env_id, f"/containers/{container_id}/exec")
-        payload = {"cmd": command.split()}
-        try:
-            resp = await client.post(url, json=payload, headers=_build_headers(agent_token))
-            resp.raise_for_status()
-            return resp.json()
-        except httpx.HTTPStatusError as e:
-            if resp.status_code == 404:
-                return {"error": "Arcane API does not expose a container exec endpoint. Use SSH to the Docker host as a workaround.", "container_id": container_id}
-            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
-            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
-        except Exception as e:
-            logger.exception("Unexpected error on %s", url)
-            return {"error": str(e)}
+        """Execute a command inside a running container.
+
+        NOTE: The Arcane API does not expose a container exec endpoint.
+        Use SSH to the Docker host as a workaround.
+        """
+        return {
+            "error": "Arcane API does not expose a container exec endpoint. Use SSH to the Docker host as a workaround.",
+            "container_id": container_id,
+        }
 
     @mcp.tool()
     async def get_container_logs(container_id: str, tail: int = 100, env_id: str = "0", agent_token: str | None = None) -> Any:
-        """Fetch logs from a container. NOTE: The Arcane API may not expose a direct logs endpoint. If 404 is returned, use SSH to the Docker host as workaround."""
-        client = require_client()
-        url = await env_path(env_id, f"/containers/{container_id}/logs")
-        params = {"tail": str(tail)}
-        try:
-            resp = await client.get(url, params=params, headers=_build_headers(agent_token))
-            resp.raise_for_status()
-            return resp.json()
-        except httpx.HTTPStatusError as e:
-            if resp.status_code == 404:
-                return {"error": "Logs endpoint not available in Arcane API. Use SSH to the Docker host as a workaround.", "container_id": container_id}
-            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
-            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
-        except Exception as e:
-            logger.exception("Unexpected error on %s", url)
-            return {"error": str(e)}
+        """Fetch logs from a container.
+
+        NOTE: The Arcane API only offers a log file download
+        (`/logs/download`), not a JSON log endpoint. Use SSH to the Docker host.
+        """
+        return {
+            "error": "Logs endpoint not available in Arcane API (only a /logs/download file). Use SSH to the Docker host as a workaround.",
+            "container_id": container_id,
+        }
 
     @mcp.tool()
     async def get_container_stats(container_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
-        """Get live resource usage stats for a container. NOTE: The Arcane API may not expose a stats endpoint. If 404 is returned, use SSH to the Docker host as workaround."""
-        client = require_client()
-        url = await env_path(env_id, f"/containers/{container_id}/stats")
-        try:
-            resp = await client.get(url, headers=_build_headers(agent_token))
-            resp.raise_for_status()
-            return resp.json()
-        except httpx.HTTPStatusError as e:
-            if resp.status_code == 404:
-                return {"error": "Stats endpoint not available in Arcane API. Use SSH to the Docker host as a workaround.", "container_id": container_id}
-            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
-            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
-        except Exception as e:
-            logger.exception("Unexpected error on %s", url)
-            return {"error": str(e)}
+        """Get live resource usage stats for a container.
+
+        NOTE: The Arcane API does not expose a stats endpoint.
+        Use SSH to the Docker host as a workaround.
+        """
+        return {
+            "error": "Stats endpoint not available in Arcane API. Use SSH to the Docker host as a workaround.",
+            "container_id": container_id,
+        }
 
     @mcp.tool()
-    async def kill_container(container_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
+    async def kill_container(
+        container_id: str,
+        signal: str | None = None,
+        env_id: str = "0",
+        agent_token: str | None = None,
+    ) -> Any:
         """Force-kill a running container. Requires confirmation token to execute."""
+        params = {"action": "kill"}
+        if signal:
+            params["signal"] = signal
         token = get_token_store().create(
             action="kill_container",
             target=container_id,
-            endpoint=await env_path(env_id, f"/containers/{container_id}/kill"),
+            endpoint=await env_path(env_id, f"/containers/{container_id}"),
             method="POST",
             body=None,
-            params=None,
+            params=params,
             classification=ToolClass.DESTRUCTIVE_WRITE,
             env_id=env_id,
             agent_token=agent_token,
         )
-        op_hash = compute_operation_hash("kill_container", container_id, None, None)
+        op_hash = compute_operation_hash("kill_container", container_id, None, params)
         return {
             "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
             "confirmation_token": token,
@@ -239,9 +235,9 @@ def register(mcp: FastMCP) -> None:
     async def pause_container(container_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Pause a running container (freeze its processes)."""
         client = require_client()
-        url = await env_path(env_id, f"/containers/{container_id}/pause")
+        url = await env_path(env_id, f"/containers/{container_id}")
         try:
-            resp = await client.post(url, headers=_build_headers(agent_token))
+            resp = await client.post(url, params={"action": "pause"}, headers=_build_headers(agent_token))
             resp.raise_for_status()
             return resp.json()
         except httpx.HTTPStatusError as e:
@@ -255,9 +251,9 @@ def register(mcp: FastMCP) -> None:
     async def unpause_container(container_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Unpause a paused container."""
         client = require_client()
-        url = await env_path(env_id, f"/containers/{container_id}/unpause")
+        url = await env_path(env_id, f"/containers/{container_id}")
         try:
-            resp = await client.post(url, headers=_build_headers(agent_token))
+            resp = await client.post(url, params={"action": "unpause"}, headers=_build_headers(agent_token))
             resp.raise_for_status()
             return resp.json()
         except httpx.HTTPStatusError as e:
@@ -284,7 +280,9 @@ def register(mcp: FastMCP) -> None:
             return {"error": str(e)}
 
     @mcp.tool()
-    async def commit_container(container_id: str, repo: str = "", tag: str = "latest", env_id: str = "0", agent_token: str | None = None) -> Any:
+    async def commit_container(
+        container_id: str, repo: str = "", tag: str = "latest", env_id: str = "0", agent_token: str | None = None
+    ) -> Any:
         """Commit a container's current state to a new image."""
         client = require_client()
         url = await env_path(env_id, f"/containers/{container_id}/commit")
@@ -320,7 +318,7 @@ def register(mcp: FastMCP) -> None:
     async def set_container_auto_update(container_id: str, enabled: bool, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Enable or disable automatic updates for a container."""
         client = require_client()
-        url = await env_path(env_id, f"/containers/{container_id}/auto-update")
+        url = await env_path(env_id, f"/containers/{container_id}/autoupdate")
         payload = {"enabled": enabled}
         try:
             resp = await client.put(url, json=payload, headers=_build_headers(agent_token))

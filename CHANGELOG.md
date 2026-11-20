@@ -3,6 +3,56 @@
 Entries start at 0.4.0. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [SemVer](https://semver.org/).
 
+## [1.0.0] — 2026-11-19
+
+Targets **Arcane v3** only. Everything below was verified against a live v3.1.1 instance and its
+`/api/openapi.json`, not inferred from the release notes.
+
+### Breaking
+
+- **Arcane v2 support is gone.** The v2 routes (`/api/environments/...`) were dropped by upstream in
+  3.0.0. If you are still on Arcane 2.x, pin `arcane-mcp==0.4.0` — the last release that speaks v2.
+- **Routes moved to `/api/agents/{id}`**, and resource *actions* moved off their sub-paths onto query
+  parameters. `POST /containers/{id}/start` is now `POST /containers/{id}?action=start`; project
+  down/restart/archive/unarchive/update-services are `POST /projects/{id}?action=...`; project
+  up/redeploy/pull is `POST /projects/{id}/deploy?action=...` with a `ProjectDeployOptions` body.
+- **Lists paginate internally.** v3 returns 20 items per page; every list tool now walks
+  `pagination.hasNextPage` and returns the whole collection in one envelope. `list_projects`
+  previously returned 20 of 34 with no way to ask for the rest.
+- **Registries are global**, at `/api/registries` (was `/api/container-registries`). Their request
+  body changed: `name` → `description`, `password` → `token`, and updates are `PATCH`.
+- **`ignore_vulnerability` signature changed**: `(urn)` → `(image_id, vulnerability_id, pkg_name,
+  reason="")`. v3 ignores by image + vulnerability + package, and a Trivy URN has no counterpart.
+- **`create_webhook` signature changed**: `(name, url)` → `(name, target_type, action_type,
+  target_id="")`. v3 webhooks are internal-event targets, not outbound URLs.
+- `kill_container` gained an optional `signal`; `stop_container`/`restart_container` keep their
+  `timeout` argument but v3 has no timeout parameter, so it is ignored.
+
+### Fixed
+
+- `PUT /system/health` → **HEAD** `/system/health`; `get_system_health` now reports from the status
+  code and headers (GET returns 404 in v3).
+- `/image-updates/*` → `/images/updates/*`; `check_image_update` takes `imageRef`.
+- `/activities/{id}/cancel` → `POST /activities/{id}?action=cancel`.
+- Per-agent events: `/api/events/environment/{id}` → `/api/events/agent/{id}`.
+- `/vulnerabilities/ignore` → `/vulnerabilities/ignored`, `scanner-status` → `scanner`.
+- System bulk actions: `POST /system/containers?action=startall|startstopped|stopall`.
+- Upgrade: `POST /system/upgrade/jobs` (JSON, 202) instead of the old streaming endpoint.
+- Volume backups: restore is `POST /volumes/{name}/backups/{id}?action=restore`; `force` moved to a
+  query parameter. `browse_volume` / `read_volume_file` now use the v3 **workspace** API.
+- Project teardown is a plain `DELETE /projects/{id}`; project update is `PATCH`.
+- Container auto-update: `/auto-update` → `/autoupdate`.
+- **HTTP timeouts**: httpx's 5-second default is replaced with connect 10 s / read 120 s, overridable
+  via `ARCANE_HTTP_TIMEOUT`. A remote Arcane or a quiet `docker pull` used to raise `ReadTimeout`
+  after the operation had already started.
+
+### Removed (reported as explicit notices, no HTTP request)
+
+These have no v3 equivalent that can be implemented without the workspace-manifest format:
+`exec_in_container`, `get_container_logs`, `get_container_stats` (v3 exposes only
+`/containers/{id}/logs/download`, a file), `create_volume_directory`, `upload_to_volume`,
+`delete_volume_file`, and `trigger_webhook` (v3 has no trigger endpoint).
+
 ## [0.4.0] — 2026-11-19
 
 ### Fixed

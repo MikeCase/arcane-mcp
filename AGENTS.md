@@ -145,28 +145,39 @@ src/arcane_mcp/
 - Auth via `X-Api-Key` header (NOT Bearer token), added at client construction
 - Remote agents send `X-Arcane-Agent-Token` header via `_build_headers(agent_token)`
 - Default Arcane port: 3552 (`http://localhost:3552`)
-- API is multi-tenant: `/api/environments/{env_id}/{resource}` on **v2**, `/api/agents/{env_id}/{resource}` on **v3+**
+- API is multi-tenant: `/api/agents/{env_id}/{resource}`. **v3+ only** — the v2 `/api/environments`
+  routes were dropped in 1.0.0 (Arcane 2.x users must pin `0.4.0`).
 - Environment "0" = default local. Remote agents use UUIDs.
 - Interactive API docs live **in the Arcane UI** at Settings → API Keys → API Reference
 - The full OpenAPI spec is served at `GET /api/openapi.json` — the fastest way to settle any
   contract question (field names, content types, method). Do not guess at payload shapes.
 
-### API version detection
+### API targeting (v3 only)
 
-Arcane **v3.0.0** renamed the routes (`/api/environments` → `/api/agents`, PR #4731) and switched
-project update from `PUT` to `PATCH`. `client.py` detects the major version once per process from
-`GET /api/version` and exposes:
+Arcane **v3.0.0** renamed `/api/environments` → `/api/agents` (PR #4731), moved resource *actions*
+onto query parameters, and switched project update to `PATCH`. **1.0.0 dropped v2 entirely** — there
+is no runtime branching left.
 
 | Helper | Returns |
 |---|---|
-| `await detect_api_version()` | `2` or `3`; cached; never raises (falls back to 2, uncached) |
-| `await api_prefix(env_id)` | `/api/agents/{env_id}` on v3, else `/api/environments/{env_id}` |
-| `await api_collection()` | `/api/agents` on v3, else `/api/environments` (no `env_id`) |
+| `await api_prefix(env_id)` | `/api/agents/{env_id}` |
+| `await api_collection()` | `/api/agents` (no `env_id`) |
 | `await env_path(env_id, suffix)` | `api_prefix(env_id) + suffix` |
+| `await paginate_all(url, params)` | one merged envelope, walking every page |
 
-`ARCANE_API_VERSION` overrides detection (`"2"`, `"3"`, `"v3.1.0"`) and makes no HTTP call — that is
-also how the test suite keeps route tests off the network. Resolve endpoints at **proposal time**
-when storing them on a confirmation token, so the token carries the fully-qualified path.
+Three things about v3 that bite:
+
+- **Actions are query params**, not sub-paths: `POST /containers/{id}?action=start`,
+  `POST /projects/{id}?action=down|restart|archive|unarchive|updateservices`,
+  `POST /system/containers?action=startall|startstopped|stopall`. Project up/redeploy/pull is
+  `POST /projects/{id}/deploy?action=...` with a `ProjectDeployOptions` body.
+- **Lists paginate at 20** with a `pagination.hasNextPage` envelope. Any tool that lists things must
+  go through `paginate_all`, or an agent silently sees the first 20 of 35.
+- `GET /system/health` is gone — **HEAD** only.
+
+Resolve endpoints at **proposal time** when storing them on a confirmation token, so the token
+carries the fully-qualified path. `detect_api_version()` still exists (cached, from `GET /api/version`)
+for diagnostics; routes no longer branch on it.
 
 ---
 

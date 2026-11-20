@@ -159,12 +159,6 @@ async def test_detect_version_unparsable_body_falls_back(httpx_mock: HTTPXMock) 
 
 
 @pytest.mark.asyncio
-async def test_api_prefix_v2(monkeypatch: pytest.MonkeyPatch) -> None:
-    """v2 uses the environments prefix."""
-    monkeypatch.setenv("ARCANE_API_VERSION", "2")
-    assert await client.api_prefix("0") == "/api/environments/0"
-
-
 @pytest.mark.asyncio
 async def test_api_prefix_v3(monkeypatch: pytest.MonkeyPatch) -> None:
     """v3 uses the agents prefix (environments was renamed upstream)."""
@@ -173,12 +167,6 @@ async def test_api_prefix_v3(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_collection_v2(monkeypatch: pytest.MonkeyPatch) -> None:
-    """v2 uses the environments collection path."""
-    monkeypatch.setenv("ARCANE_API_VERSION", "2")
-    assert await client.api_collection() == "/api/environments"
-
-
 @pytest.mark.asyncio
 async def test_collection_v3(monkeypatch: pytest.MonkeyPatch) -> None:
     """v3 uses the agents collection path (environments was renamed upstream)."""
@@ -187,28 +175,17 @@ async def test_collection_v3(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_collection_failure_falls_back_to_v2(httpx_mock: HTTPXMock) -> None:
-    """A failed /api/version probe still yields the v2 collection path."""
-    httpx_mock.add_response(
-        url=VERSION_URL,
-        method="GET",
-        status_code=500,
-        text="boom",
-    )
-    assert await client.api_collection() == "/api/environments"
-    assert len(httpx_mock.get_requests()) == 1
+async def test_collection_makes_no_request(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The collection path is static now — no version probe, no HTTP."""
+    monkeypatch.delenv("ARCANE_API_VERSION", raising=False)
+    assert await client.api_collection() == "/api/agents"
+    assert await client.api_prefix("0") == "/api/agents/0"
 
 
 @pytest.mark.asyncio
-async def test_env_path_v2(monkeypatch: pytest.MonkeyPatch) -> None:
-    """env_path joins the v2 prefix and suffix."""
-    monkeypatch.setenv("ARCANE_API_VERSION", "2")
-    assert await client.env_path("0", "/projects") == "/api/environments/0/projects"
-
-
 @pytest.mark.asyncio
-async def test_env_path_v3(monkeypatch: pytest.MonkeyPatch) -> None:
-    """env_path joins the v3 prefix and suffix."""
+async def test_env_path_joins_prefix(monkeypatch: pytest.MonkeyPatch) -> None:
+    """env_path joins the agents prefix and suffix."""
     monkeypatch.setenv("ARCANE_API_VERSION", "3")
     assert await client.env_path("0", "/projects/p1") == "/api/agents/0/projects/p1"
 

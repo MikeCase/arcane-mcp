@@ -1,9 +1,10 @@
-"""Environment management tools.
+"""Environment (agent) management tools.
 
 Arcane v3 calls these "agents": the collection moved from the v2 environments
-path to ``/api/agents`` (upstream PR #4731), and v3 serves no v2 alias.  Every
-route here is resolved at call time through ``client.api_collection`` /
-``client.env_path`` so the tool names and payloads stay the same on both majors.
+path to ``/api/agents`` (upstream PR #4731), v3 serves no v2 alias, and 1.0.0 of
+this server dropped v2 entirely.  Tool names keep the word "environment" for
+public API stability; the docstrings say "agent" so a model knows what it is
+actually listing.
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ from typing import Any
 import httpx
 from fastmcp import FastMCP
 
-from ..client import api_collection, env_path, require_client
+from ..client import api_collection, env_path, paginate_all, require_client
 from ..safety import ToolClass, compute_operation_hash, get_token_store
 
 logger = logging.getLogger(__name__)
@@ -23,23 +24,20 @@ logger = logging.getLogger(__name__)
 def register(mcp: FastMCP) -> None:
     @mcp.tool()
     async def list_environments() -> Any:
-        """List all environments (local + remote agents)."""
-        client = require_client()
+        """List all environments (agents): the local agent plus every remote agent (every page)."""
         url = await api_collection()
         try:
-            resp = await client.get(url)
-            resp.raise_for_status()
-            return resp.json()
+            return await paginate_all(url)
         except httpx.HTTPStatusError as e:
-            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
-            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+            logger.warning("HTTP %s on %s: %s", e.response.status_code, url, e.response.text)
+            return {"error": str(e), "status_code": e.response.status_code, "detail": e.response.text}
         except Exception as e:
             logger.exception("Unexpected error on %s", url)
             return {"error": str(e)}
 
     @mcp.tool()
     async def get_environment(env_id: str) -> Any:
-        """Get details of a specific environment."""
+        """Get details of one environment (agent) by ID."""
         client = require_client()
         url = await env_path(env_id, "")
         try:
@@ -77,7 +75,7 @@ def register(mcp: FastMCP) -> None:
 
     @mcp.tool()
     async def update_environment(env_id: str, name: str | None = None, api_url: str | None = None, agent_token: str | None = None) -> Any:
-        """Update environment settings (name, API URL, or access token)."""
+        """Update agent settings (name, API URL, or access token). v3 uses PATCH."""
         client = require_client()
         url = await env_path(env_id, "")
         payload: dict[str, Any] = {}
@@ -88,7 +86,7 @@ def register(mcp: FastMCP) -> None:
         if agent_token is not None:
             payload["accessToken"] = agent_token
         try:
-            resp = await client.put(url, json=payload)
+            resp = await client.patch(url, json=payload)
             resp.raise_for_status()
             return resp.json()
         except httpx.HTTPStatusError as e:
@@ -100,7 +98,7 @@ def register(mcp: FastMCP) -> None:
 
     @mcp.tool()
     async def remove_environment(env_id: str) -> Any:
-        """Remove an environment. Requires confirmation via confirmation_token."""
+        """Remove an environment (agent). Requires confirmation via confirmation_token."""
         token = get_token_store().create(
             action="remove_environment",
             target=env_id,

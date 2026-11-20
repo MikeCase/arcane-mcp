@@ -9,7 +9,7 @@ import logging
 import os
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -21,7 +21,7 @@ _POLICY_VERSION = "1.0.0"  # bumped when safety semantics change
 # ── Tool Classification ──
 
 
-class ToolClass(str, Enum):
+class ToolClass(str, Enum):  # noqa: UP042 — StrEnum would change str(member)
     READ = "read"
     REVERSIBLE_WRITE = "reversible_write"
     DESTRUCTIVE_WRITE = "destructive_write"
@@ -246,7 +246,7 @@ class AuditLog:
         """Event 1: operation was proposed (token created)."""
         entry: dict[str, Any] = {
             "event": "operation_proposed",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "token": token,
             "action": action,
             "target": target,
@@ -272,7 +272,7 @@ class AuditLog:
         self._write(
             {
                 "event": "operation_approved",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "token": token,
                 "action": action,
                 "target": target,
@@ -293,7 +293,7 @@ class AuditLog:
         """Event 3: operation completed (success or failure)."""
         entry: dict[str, Any] = {
             "event": "operation_result",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "token": token,
             "action": action,
             "target": target,

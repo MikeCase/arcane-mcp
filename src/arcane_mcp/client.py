@@ -1,15 +1,15 @@
 """HTTP client helpers for Arcane API.
 
-Arcane v3.0.0 renamed the multi-tenant environment routes from
-``/api/environments/{env_id}`` to ``/api/agents/{env_id}`` (upstream PR
-#4731); v3 serves no ``/api/environments`` alias at all.  The project and
-resource payloads stayed the same, only the path prefix — and, for project
-updates, ``PUT`` became ``PATCH``.
+Targets Arcane **v3+** only (the project's 1.0.0 line dropped v2).
 
-So the base path has to be resolved at runtime instead of hardcoded.  The
-server version is read once per process from ``GET /api/version`` (present on
-both majors) and cached; ``ARCANE_API_VERSION`` overrides that lookup for
-tests and for pinning a deployment.
+Arcane v3.0.0 renamed the multi-tenant routes from ``/api/environments/{env_id}``
+to ``/api/agents/{env_id}`` (upstream PR #4731) — v3 serves no
+``/api/environments`` alias at all — and moved resource *actions* off their
+sub-paths onto a query parameter (``POST /containers/{id}?action=start``).
+
+Lists paginate: every v3 collection returns 20 items by default with a
+``pagination`` envelope, so :func:`paginate_all` walks the pages instead of
+letting an agent silently see the first 20 of 35.
 """
 
 from __future__ import annotations
@@ -47,9 +47,15 @@ def get_client() -> httpx.AsyncClient | None:
         if not base or not key:
             logger.warning("Arcane client not configured: ARCANE_BASE_URL or ARCANE_API_KEY missing")
             return None
+        # httpx defaults to 5 s for every phase, which is fine for a LAN and
+        # lethal over the internet: a docker pull or image build that goes quiet
+        # for five seconds raises ReadTimeout *after* the operation started.
+        # ARCANE_HTTP_TIMEOUT (seconds) overrides the read phase.
+        read_timeout = float(os.environ.get("ARCANE_HTTP_TIMEOUT", "120"))
         _client = httpx.AsyncClient(
             base_url=base.rstrip("/"),
             headers={"X-Api-Key": key},
+            timeout=httpx.Timeout(connect=10.0, read=read_timeout, write=30.0, pool=10.0),
         )
         logger.info("Arcane client created for %s", base)
     return _client
@@ -144,27 +150,17 @@ async def detect_api_version() -> int:
 
 
 async def api_prefix(env_id: str) -> str:
-    """Return the multi-tenant base path for *env_id* on the detected server.
-
-    ``/api/agents/{env_id}`` on v3+, ``/api/environments/{env_id}`` on v2.
-    """
-    major = await detect_api_version()
-    if major >= 3:
-        return f"/api/agents/{env_id}"
-    return f"/api/environments/{env_id}"
+    """Return the multi-tenant base path for *env_id*."""
+    return f"/api/agents/{env_id}"
 
 
 async def api_collection() -> str:
-    """Return the environment-collection base path on the detected server.
+    """Return the agent-collection base path.
 
-    ``/api/agents`` on v3+, ``/api/environments`` on v2.  Unlike
-    :func:`api_prefix`, this path carries no ``env_id`` — it is the collection
+    Unlike :func:`api_prefix` this carries no ``env_id`` — it is the collection
     itself, which the environments tools (list/create/get/update/remove) manage.
     """
-    major = await detect_api_version()
-    if major >= 3:
-        return "/api/agents"
-    return "/api/environments"
+    return "/api/agents"
 
 
 async def env_path(env_id: str, suffix: str) -> str:
@@ -241,3 +237,56 @@ def parse_stream_response(resp: httpx.Response) -> dict[str, Any]:
             logs.append(record["log"])
 
     return result
+
+
+async def paginate_all(
+    url: str,
+    params: dict[str, Any] | None = None,
+    agent_token: str | None = None,
+    page_size: int = 100,
+    max_items: int = 5000,
+) -> dict[str, Any]:
+    """Fetch every page of a v3 collection and return one merged envelope.
+
+    v3 returns 20 items by default with ``{"data": [...], "pagination":
+    {"hasNextPage": bool, ...}}``. An agent asking "list my projects" means all
+    of them, not the first 20 and no way to ask for more — the tools take no
+    paging arguments, so paging is done here.
+
+    The returned envelope keeps the server's shape with ``data`` replaced by the
+    accumulated items. ``max_items`` is a guard against a runaway loop, not a
+    limit anyone should normalise to.
+
+    ``agent_token`` is forwarded as ``X-Arcane-Agent-Token`` — same as the
+    non-paginated path, so a remote agent's list is not silently empty.
+    """
+    client = require_client()
+    collected: list[Any] = []
+    envelope: dict[str, Any] = {}
+    start = 0
+
+    while True:
+        query = dict(params or {})
+        query["start"] = start
+        query["limit"] = page_size
+        resp = await client.get(url, params=query, headers=_build_headers(agent_token))
+        resp.raise_for_status()
+        body = resp.json()
+        envelope = body if isinstance(body, dict) else {"data": body}
+        page = envelope.get("data") or []
+        if not isinstance(page, list):
+            return envelope
+
+        collected.extend(page)
+        pagination = envelope.get("pagination") or {}
+        if not pagination.get("hasNextPage") or not page or len(collected) >= max_items:
+            break
+        start += len(page)
+
+    envelope["data"] = collected
+    if isinstance(envelope.get("pagination"), dict):
+        envelope["pagination"] = {
+            **envelope["pagination"],
+            "totalItems": len(collected),
+        }
+    return envelope

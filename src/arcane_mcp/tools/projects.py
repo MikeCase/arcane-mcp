@@ -1,4 +1,12 @@
-"""Compose project management tools."""
+"""Compose project management tools.
+
+Targets Arcane v3+ only.  v3 moved project *actions* off their own sub-paths and
+onto a query parameter — ``POST /projects/{projectId}?action=down`` — and gave
+up/redeploy/pull a single endpoint, ``POST /projects/{projectId}/deploy``, whose
+``action`` query parameter picks the operation and whose JSON body is a
+``ProjectDeployOptions``.  Project update is ``PATCH``, teardown is a plain
+``DELETE /projects/{projectId}``.
+"""
 
 from __future__ import annotations
 
@@ -9,33 +17,51 @@ from typing import Any
 import httpx
 from fastmcp import FastMCP
 
-from ..client import _build_headers, detect_api_version, env_path, parse_stream_response, require_client
+from ..client import _build_headers, env_path, paginate_all, parse_stream_response, require_client
 from ..safety import ToolClass, compute_operation_hash, get_token_store
 
 logger = logging.getLogger(__name__)
 
+_DEFAULT_WARNING = "Destructive operation. Call confirm_operation(token=...) to proceed."
 
-async def _project_update_method() -> str:
-    """Project update verb: PATCH on Arcane v3+, PUT on v2.
 
-    The v3.0.0 route rename (environments -> agents) came with a switch to
-    PATCH for project updates; the request body keys are unchanged.
+def _propose_operation(
+    *,
+    action: str,
+    target: str,
+    endpoint: str,
+    env_id: str,
+    agent_token: str | None,
+    method: str = "POST",
+    body: dict[str, Any] | None = None,
+    params: dict[str, Any] | None = None,
+    warning: str = _DEFAULT_WARNING,
+) -> dict[str, Any]:
+    """Create a confirmation token for an operation and return the proposal.
+
+    ``endpoint`` is already fully resolved by the caller (``env_path``), so the
+    token carries the exact path and the query parameters that were proposed —
+    ``confirm_operation()`` replays both verbatim.
     """
-    return "PATCH" if await detect_api_version() >= 3 else "PUT"
-
-
-async def _project_destroy_endpoint(env_id: str, project_id: str) -> str:
-    """Where a project is torn down.
-
-    v2 keeps teardown on its own route (``DELETE /projects/{projectId}/destroy``;
-    the bare ``DELETE /projects/{projectId}`` does not exist there).  v3 folded
-    it into the resource itself (``DELETE /projects/{projectId}``, operation
-    ``destroy-project``).  Calling the wrong one is a 404, so it is resolved at
-    proposal time and travels on the confirmation token.
-    """
-    if await detect_api_version() >= 3:
-        return await env_path(env_id, f"/projects/{project_id}")
-    return await env_path(env_id, f"/projects/{project_id}/destroy")
+    token = get_token_store().create(
+        action=action,
+        target=target,
+        endpoint=endpoint,
+        method=method,
+        body=body,
+        params=params,
+        classification=ToolClass.DESTRUCTIVE_WRITE,
+        env_id=env_id,
+        agent_token=agent_token,
+    )
+    return {
+        "warning": warning,
+        "confirmation_token": token,
+        "classification": ToolClass.DESTRUCTIVE_WRITE,
+        "operation_hash": compute_operation_hash(action, target, body, params),
+        "target": target,
+        "action": action,
+    }
 
 
 def _parse_compose_plan(compose_content: str) -> dict:
@@ -66,15 +92,12 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     async def list_projects(env_id: str = "0", agent_token: str | None = None) -> Any:
         """List all Compose projects in the given environment."""
-        client = require_client()
         url = await env_path(env_id, "/projects")
         try:
-            resp = await client.get(url, headers=_build_headers(agent_token))
-            resp.raise_for_status()
-            return resp.json()
+            return await paginate_all(url, agent_token=agent_token)
         except httpx.HTTPStatusError as e:
-            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
-            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+            logger.warning("HTTP %s on %s: %s", e.response.status_code, url, e.response.text)
+            return {"error": str(e), "status_code": e.response.status_code, "detail": e.response.text}
         except Exception as e:
             logger.exception("Unexpected error on %s", url)
             return {"error": str(e)}
@@ -136,9 +159,16 @@ def register(mcp: FastMCP) -> None:
     async def redeploy_project(project_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Redeploy a Compose project."""
         client = require_client()
-        url = await env_path(env_id, f"/projects/{project_id}/redeploy")
+        url = await env_path(env_id, f"/projects/{project_id}/deploy")
         try:
-            resp = await client.post(url, headers=_build_headers(agent_token))
+            # build=true: a "redeploy" that skips the build would serve a stale
+            # image, which is what the upstream GitOps sync avoids too.
+            resp = await client.post(
+                url,
+                headers=_build_headers(agent_token),
+                params={"action": "redeploy"},
+                json={"build": True},
+            )
             resp.raise_for_status()
             return parse_stream_response(resp)
         except httpx.HTTPStatusError as e:
@@ -151,25 +181,14 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     async def remove_project(project_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Remove a Compose project."""
-        token = get_token_store().create(
+        return _propose_operation(
             action="remove_project",
             target=project_id,
-            endpoint=await _project_destroy_endpoint(env_id, project_id),
+            endpoint=await env_path(env_id, f"/projects/{project_id}"),
             method="DELETE",
-            body=None,
-            params=None,
-            classification=ToolClass.DESTRUCTIVE_WRITE,
             env_id=env_id,
             agent_token=agent_token,
         )
-        return {
-            "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
-            "confirmation_token": token,
-            "classification": ToolClass.DESTRUCTIVE_WRITE,
-            "operation_hash": compute_operation_hash("remove_project", project_id, None, None),
-            "target": project_id,
-            "action": "remove_project",
-        }
 
     @mcp.tool()
     async def update_project(
@@ -194,7 +213,7 @@ def register(mcp: FastMCP) -> None:
             action="update_project",
             target=project_id,
             endpoint=await env_path(env_id, f"/projects/{project_id}"),
-            method=await _project_update_method(),
+            method="PATCH",
             body=payload,
             params=None,
             classification=ToolClass.DESTRUCTIVE_WRITE,
@@ -234,48 +253,28 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     async def project_down(project_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Take a Compose project down (stop and remove containers)."""
-        token = get_token_store().create(
+        return _propose_operation(
             action="project_down",
             target=project_id,
-            endpoint=await env_path(env_id, f"/projects/{project_id}/down"),
-            method="POST",
-            body=None,
-            params=None,
-            classification=ToolClass.DESTRUCTIVE_WRITE,
+            endpoint=await env_path(env_id, f"/projects/{project_id}"),
+            params={"action": "down"},
             env_id=env_id,
             agent_token=agent_token,
         )
-        return {
-            "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
-            "confirmation_token": token,
-            "classification": ToolClass.DESTRUCTIVE_WRITE,
-            "operation_hash": compute_operation_hash("project_down", project_id, None, None),
-            "target": project_id,
-            "action": "project_down",
-        }
 
     @mcp.tool()
     async def restart_project(project_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Restart a Compose project."""
-        token = get_token_store().create(
+        # An empty services list (i.e. no ``services`` query parameter) targets
+        # every service in the project.
+        return _propose_operation(
             action="restart_project",
             target=project_id,
-            endpoint=await env_path(env_id, f"/projects/{project_id}/restart"),
-            method="POST",
-            body=None,
-            params=None,
-            classification=ToolClass.DESTRUCTIVE_WRITE,
+            endpoint=await env_path(env_id, f"/projects/{project_id}"),
+            params={"action": "restart"},
             env_id=env_id,
             agent_token=agent_token,
         )
-        return {
-            "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
-            "confirmation_token": token,
-            "classification": ToolClass.DESTRUCTIVE_WRITE,
-            "operation_hash": compute_operation_hash("restart_project", project_id, None, None),
-            "target": project_id,
-            "action": "restart_project",
-        }
 
     @mcp.tool()
     async def build_project(project_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
@@ -297,9 +296,13 @@ def register(mcp: FastMCP) -> None:
     async def archive_project(project_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Archive a Compose project."""
         client = require_client()
-        url = await env_path(env_id, f"/projects/{project_id}/archive")
+        url = await env_path(env_id, f"/projects/{project_id}")
         try:
-            resp = await client.post(url, headers=_build_headers(agent_token))
+            resp = await client.post(
+                url,
+                headers=_build_headers(agent_token),
+                params={"action": "archive"},
+            )
             resp.raise_for_status()
             return resp.json()
         except httpx.HTTPStatusError as e:
@@ -313,9 +316,13 @@ def register(mcp: FastMCP) -> None:
     async def unarchive_project(project_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Unarchive a Compose project."""
         client = require_client()
-        url = await env_path(env_id, f"/projects/{project_id}/unarchive")
+        url = await env_path(env_id, f"/projects/{project_id}")
         try:
-            resp = await client.post(url, headers=_build_headers(agent_token))
+            resp = await client.post(
+                url,
+                headers=_build_headers(agent_token),
+                params={"action": "unarchive"},
+            )
             resp.raise_for_status()
             return resp.json()
         except httpx.HTTPStatusError as e:
@@ -329,9 +336,17 @@ def register(mcp: FastMCP) -> None:
     async def pull_project_images(project_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Pull images for a Compose project."""
         client = require_client()
-        url = await env_path(env_id, f"/projects/{project_id}/pull")
+        url = await env_path(env_id, f"/projects/{project_id}/deploy")
         try:
-            resp = await client.post(url, headers=_build_headers(agent_token))
+            # Empty ProjectDeployOptions: the ``pull`` action is itself the
+            # instruction to pull, so leave the policy to the server/project
+            # rather than forcing ``"always"`` over a policy the user chose.
+            resp = await client.post(
+                url,
+                headers=_build_headers(agent_token),
+                params={"action": "pull"},
+                json={},
+            )
             resp.raise_for_status()
             return parse_stream_response(resp)
         except httpx.HTTPStatusError as e:
@@ -366,7 +381,7 @@ def register(mcp: FastMCP) -> None:
     async def get_project_file(project_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Get the project file content for a Compose project."""
         client = require_client()
-        url = await env_path(env_id, f"/projects/{project_id}/file")
+        url = await env_path(env_id, f"/projects/{project_id}/workspace/file")
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -386,10 +401,15 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     async def update_project_services(project_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Update services of a Compose project from the current compose config."""
+        # No ``services`` query parameter: the action targets every service.
         client = require_client()
-        url = await env_path(env_id, f"/projects/{project_id}/update-services")
+        url = await env_path(env_id, f"/projects/{project_id}")
         try:
-            resp = await client.post(url, headers=_build_headers(agent_token))
+            resp = await client.post(
+                url,
+                headers=_build_headers(agent_token),
+                params={"action": "updateservices"},
+            )
             resp.raise_for_status()
             return resp.json()
         except httpx.HTTPStatusError as e:

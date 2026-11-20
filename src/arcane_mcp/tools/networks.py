@@ -8,7 +8,7 @@ from typing import Any
 import httpx
 from fastmcp import FastMCP
 
-from ..client import _build_headers, env_path, require_client
+from ..client import _build_headers, env_path, paginate_all, require_client
 from ..safety import ToolClass, compute_operation_hash, get_token_store
 
 logger = logging.getLogger(__name__)
@@ -18,15 +18,12 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     async def list_networks(env_id: str = "0", agent_token: str | None = None) -> Any:
         """List all networks in the given environment."""
-        client = require_client()
         url = await env_path(env_id, "/networks")
         try:
-            resp = await client.get(url, headers=_build_headers(agent_token))
-            resp.raise_for_status()
-            return resp.json()
+            return await paginate_all(url)
         except httpx.HTTPStatusError as e:
-            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
-            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+            logger.warning("HTTP %s on %s: %s", e.response.status_code, url, e.response.text)
+            return {"error": str(e), "status_code": e.response.status_code, "detail": e.response.text}
         except Exception as e:
             logger.exception("Unexpected error on %s", url)
             return {"error": str(e)}
@@ -90,10 +87,10 @@ def register(mcp: FastMCP) -> None:
     async def connect_container_to_network(network_id: str, container_id: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Connect a container to a network."""
         client = require_client()
-        url = await env_path(env_id, f"/networks/{network_id}/connect")
-        payload = {"container": container_id}
+        url = await env_path(env_id, f"/networks/{network_id}")
+        payload = {"containerId": container_id}
         try:
-            resp = await client.post(url, json=payload, headers=_build_headers(agent_token))
+            resp = await client.post(url, params={"action": "connect"}, json=payload, headers=_build_headers(agent_token))
             resp.raise_for_status()
             return resp.json()
         except httpx.HTTPStatusError as e:
@@ -112,10 +109,10 @@ def register(mcp: FastMCP) -> None:
     ) -> Any:
         """Disconnect a container from a network."""
         client = require_client()
-        url = await env_path(env_id, f"/networks/{network_id}/disconnect")
-        payload = {"container": container_id}
+        url = await env_path(env_id, f"/networks/{network_id}")
+        payload = {"containerId": container_id, "force": False}
         try:
-            resp = await client.post(url, json=payload, headers=_build_headers(agent_token))
+            resp = await client.post(url, params={"action": "disconnect"}, json=payload, headers=_build_headers(agent_token))
             resp.raise_for_status()
             return resp.json()
         except httpx.HTTPStatusError as e:

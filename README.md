@@ -6,6 +6,12 @@ Covers the core Docker management API: containers, images, volumes, networks, Co
 
 **127 tools across 14 modules.**
 
+> **Requires Arcane v3.0.0 or newer** (developed against v3.1.1). The v2 API was
+> dropped in 1.0.0: v3 renamed `/api/environments` to `/api/agents`, moved resource
+> actions onto query parameters (`POST /containers/{id}?action=start`), and changed
+> project deploy to `/projects/{id}/deploy`. If you are still on Arcane 2.x, pin
+> `arcane-mcp` at `0.4.0` — that is the last release with v2 support.
+
 ## Install
 
 Not on PyPI. Install directly from GitHub:

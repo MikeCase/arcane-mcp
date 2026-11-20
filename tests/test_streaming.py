@@ -99,8 +99,9 @@ def test_empty_body() -> None:
 async def test_redeploy_project_parses_stream(mcp: Any, httpx_mock: Any) -> None:
     """redeploy_project returns the parsed stream, not a JSONDecodeError."""
     httpx_mock.add_response(
-        url="http://localhost:3552/api/environments/0/projects/p1/redeploy",
+        url="http://localhost:3552/api/agents/0/projects/p1/deploy",
         method="POST",
+        match_params={"action": "redeploy"},
         content=b'{"activityId":"a1","type":"activity"}\n{"log":"step"}\n{"done":true}\n',
         headers={"content-type": "application/x-json-stream"},
     )

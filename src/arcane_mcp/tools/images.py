@@ -8,7 +8,7 @@ from typing import Any
 import httpx
 from fastmcp import FastMCP
 
-from ..client import _build_headers, env_path, parse_stream_response, require_client
+from ..client import _build_headers, env_path, paginate_all, parse_stream_response, require_client
 from ..safety import ToolClass, compute_operation_hash, get_token_store
 
 logger = logging.getLogger(__name__)
@@ -18,15 +18,17 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     async def list_images(env_id: str = "0", agent_token: str | None = None) -> Any:
         """List all images in the given environment."""
-        client = require_client()
         url = await env_path(env_id, "/images")
         try:
-            resp = await client.get(url, headers=_build_headers(agent_token))
-            resp.raise_for_status()
-            return resp.json()
+            # v3 pages collections at 20 by default.
+            return await paginate_all(url, agent_token=agent_token)
         except httpx.HTTPStatusError as e:
-            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
-            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+            logger.warning("HTTP %s on %s: %s", e.response.status_code, url, e.response.text)
+            return {
+                "error": str(e),
+                "status_code": e.response.status_code,
+                "detail": e.response.text,
+            }
         except Exception as e:
             logger.exception("Unexpected error on %s", url)
             return {"error": str(e)}
@@ -316,8 +318,10 @@ def register(mcp: FastMCP) -> None:
     async def check_image_update(reference: str, env_id: str = "0", agent_token: str | None = None) -> Any:
         """Check if a newer version of an image is available by reference."""
         client = require_client()
-        url = await env_path(env_id, "/image-updates/check")
-        params = {"reference": reference}
+        # v3 moved the image-update routes under /images/updates and renamed the
+        # reference query parameter to `imageRef`.
+        url = await env_path(env_id, "/images/updates/check")
+        params = {"imageRef": reference}
         try:
             resp = await client.get(url, params=params, headers=_build_headers(agent_token))
             resp.raise_for_status()
@@ -333,9 +337,12 @@ def register(mcp: FastMCP) -> None:
     async def check_all_image_updates(env_id: str = "0", agent_token: str | None = None) -> Any:
         """Check for updates on all images in the environment."""
         client = require_client()
-        url = await env_path(env_id, "/image-updates/check-all")
+        # POST /images/updates/check?action=all — a batch body (`imageRefs`) is
+        # only needed for action=batch.
+        url = await env_path(env_id, "/images/updates/check")
+        params = {"action": "all"}
         try:
-            resp = await client.post(url, headers=_build_headers(agent_token))
+            resp = await client.post(url, params=params, headers=_build_headers(agent_token))
             resp.raise_for_status()
             return resp.json()
         except httpx.HTTPStatusError as e:
@@ -349,7 +356,7 @@ def register(mcp: FastMCP) -> None:
     async def get_image_update_summary(env_id: str = "0", agent_token: str | None = None) -> Any:
         """Get a summary of available image updates."""
         client = require_client()
-        url = await env_path(env_id, "/image-updates/summary")
+        url = await env_path(env_id, "/images/updates/summary")
         try:
             resp = await client.get(url, headers=_build_headers(agent_token))
             resp.raise_for_status()

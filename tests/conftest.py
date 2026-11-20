@@ -24,14 +24,14 @@ from arcane_mcp.tools import (
 def setup_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Set default env vars for all tests.
 
-    ``ARCANE_API_VERSION`` is pinned so route construction never probes
+    ``ARCANE_API_VERSION`` is pinned to v3 so route construction never probes
     ``GET /api/version``: tests must not touch the network, and an un-mocked
     probe would also consume the first ``httpx_mock`` response. Tests that
     exercise detection itself override it locally (see ``test_client.py``).
     """
     monkeypatch.setenv("ARCANE_BASE_URL", "http://localhost:3552")
     monkeypatch.setenv("ARCANE_API_KEY", "test-key-abc123")
-    monkeypatch.setenv("ARCANE_API_VERSION", "2")
+    monkeypatch.setenv("ARCANE_API_VERSION", "3")
 
 
 @pytest.fixture

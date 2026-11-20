@@ -58,7 +58,12 @@ def register(mcp: FastMCP) -> None:
         agent_token: str | None = None,
         dry_run: bool = True,
     ) -> Any:
-        """Prune system resources for the given environment. Select what to prune via flags (containers, images, volumes, networks, build_cache). Volumes default to False. Use dry_run=True (default) to preview what would be pruned without making changes."""
+        """Prune system resources for the given environment.
+
+        Select what to prune via flags (containers, images, volumes, networks, build_cache).
+        Volumes default to False. Use dry_run=True (default) to preview what would be
+        pruned without making changes.
+        """
         if dry_run:
             return {
                 "dry_run": True,
@@ -107,14 +112,17 @@ def register(mcp: FastMCP) -> None:
     async def get_system_health(env_id: str = "0", agent_token: str | None = None) -> Any:
         """Get system health metrics for the given environment."""
         client = require_client()
-        url = "/api/health"
+        url = await env_path(env_id, "/system/health")
         try:
-            resp = await client.get(url, headers=_build_headers(agent_token))
-            resp.raise_for_status()
-            return resp.json()
-        except httpx.HTTPStatusError as e:
-            logger.warning("HTTP %s on %s: %s", resp.status_code, url, resp.text)
-            return {"error": str(e), "status_code": resp.status_code, "detail": resp.text}
+            # v3 serves HEAD only on this route (GET 404s) and HEAD has no body,
+            # so the status code *is* the answer: 200 = daemon responsive.
+            # `healthy: False` is a real result, not an error, so no raise_for_status.
+            resp = await client.head(url, headers=_build_headers(agent_token))
+            return {
+                "status": resp.status_code,
+                "healthy": resp.status_code == 200,
+                "headers": dict(resp.headers),
+            }
         except Exception as e:
             logger.exception("Unexpected error on %s", url)
             return {"error": str(e)}
@@ -138,25 +146,26 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     async def trigger_upgrade(env_id: str = "0", agent_token: str | None = None) -> Any:
         """Trigger a system upgrade for the given environment."""
+        # v3 moved system upgrade onto the job system: POST /system/upgrade/jobs
+        # returns 202 JSON (an UpgradeJob envelope), not an action stream — the
+        # old stream encoding is gone. Progress is GET /system/upgrade/jobs/current.
+        body = {"environmentIds": [env_id]}
         token = get_token_store().create(
             action="trigger_upgrade",
             target=f"system:{env_id}",
-            endpoint=await env_path(env_id, "/system/upgrade"),
+            endpoint=await env_path(env_id, "/system/upgrade/jobs"),
             method="POST",
-            body=None,
+            body=body,
             params=None,
             classification=ToolClass.DESTRUCTIVE_WRITE,
             env_id=env_id,
             agent_token=agent_token,
-            # /system/upgrade streams an application/x-json-stream action log;
-            # confirm_operation must parse it with parse_stream_response().
-            encoding="stream",
         )
         return {
             "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
             "confirmation_token": token,
             "classification": ToolClass.DESTRUCTIVE_WRITE,
-            "operation_hash": compute_operation_hash("trigger_upgrade", f"system:{env_id}", None, None),
+            "operation_hash": compute_operation_hash("trigger_upgrade", f"system:{env_id}", body, None),
             "target": f"system:{env_id}",
             "action": "trigger_upgrade",
         }
@@ -167,13 +176,15 @@ def register(mcp: FastMCP) -> None:
         agent_token: str | None = None,
     ) -> Any:
         """Start all stopped containers for the given environment."""
+        body = None
+        params = {"action": "startall"}
         token = get_token_store().create(
             action="start_all_containers",
             target=f"system:{env_id}",
-            endpoint=await env_path(env_id, "/system/containers/start-all"),
+            endpoint=await env_path(env_id, "/system/containers"),
             method="POST",
-            body=None,
-            params=None,
+            body=body,
+            params=params,
             classification=ToolClass.DESTRUCTIVE_WRITE,
             env_id=env_id,
             agent_token=agent_token,
@@ -182,7 +193,7 @@ def register(mcp: FastMCP) -> None:
             "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
             "confirmation_token": token,
             "classification": ToolClass.DESTRUCTIVE_WRITE,
-            "operation_hash": compute_operation_hash("start_all_containers", f"system:{env_id}", None, None),
+            "operation_hash": compute_operation_hash("start_all_containers", f"system:{env_id}", body, params),
             "target": f"system:{env_id}",
             "action": "start_all_containers",
         }
@@ -193,13 +204,15 @@ def register(mcp: FastMCP) -> None:
         agent_token: str | None = None,
     ) -> Any:
         """Start only containers that are currently stopped for the given environment."""
+        body = None
+        params = {"action": "startstopped"}
         token = get_token_store().create(
             action="start_stopped_containers",
             target=f"system:{env_id}",
-            endpoint=await env_path(env_id, "/system/containers/start-stopped"),
+            endpoint=await env_path(env_id, "/system/containers"),
             method="POST",
-            body=None,
-            params=None,
+            body=body,
+            params=params,
             classification=ToolClass.DESTRUCTIVE_WRITE,
             env_id=env_id,
             agent_token=agent_token,
@@ -208,7 +221,7 @@ def register(mcp: FastMCP) -> None:
             "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
             "confirmation_token": token,
             "classification": ToolClass.DESTRUCTIVE_WRITE,
-            "operation_hash": compute_operation_hash("start_stopped_containers", f"system:{env_id}", None, None),
+            "operation_hash": compute_operation_hash("start_stopped_containers", f"system:{env_id}", body, params),
             "target": f"system:{env_id}",
             "action": "start_stopped_containers",
         }
@@ -219,13 +232,15 @@ def register(mcp: FastMCP) -> None:
         agent_token: str | None = None,
     ) -> Any:
         """Stop all running containers for the given environment."""
+        body = None
+        params = {"action": "stopall"}
         token = get_token_store().create(
             action="stop_all_containers",
             target=f"system:{env_id}",
-            endpoint=await env_path(env_id, "/system/containers/stop-all"),
+            endpoint=await env_path(env_id, "/system/containers"),
             method="POST",
-            body=None,
-            params=None,
+            body=body,
+            params=params,
             classification=ToolClass.DESTRUCTIVE_WRITE,
             env_id=env_id,
             agent_token=agent_token,
@@ -234,7 +249,7 @@ def register(mcp: FastMCP) -> None:
             "warning": "Destructive operation. Call confirm_operation(token=...) to proceed.",
             "confirmation_token": token,
             "classification": ToolClass.DESTRUCTIVE_WRITE,
-            "operation_hash": compute_operation_hash("stop_all_containers", f"system:{env_id}", None, None),
+            "operation_hash": compute_operation_hash("stop_all_containers", f"system:{env_id}", body, params),
             "target": f"system:{env_id}",
             "action": "stop_all_containers",
         }
